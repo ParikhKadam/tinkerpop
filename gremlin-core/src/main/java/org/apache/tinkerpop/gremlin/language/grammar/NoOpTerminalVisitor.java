@@ -19,14 +19,18 @@
 package org.apache.tinkerpop.gremlin.language.grammar;
 
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
+import org.apache.tinkerpop.gremlin.process.traversal.GremlinLang;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
+import org.apache.tinkerpop.gremlin.structure.Graph;
+
+import java.util.function.Supplier;
 
 /**
  * {@inheritDoc}
  *
- * The same as parent visitor {@link GremlinAntlrToJava} but returns {@link Bytecode} instead of a {@link Traversal}
+ * The same as parent visitor {@link GremlinAntlrToJava} but returns {@link GremlinLang} instead of a {@link Traversal}
  * or {@link GraphTraversalSource}, and uses an overridden terminal step visitor.
  */
 public class NoOpTerminalVisitor extends GremlinAntlrToJava {
@@ -35,13 +39,23 @@ public class NoOpTerminalVisitor extends GremlinAntlrToJava {
         super();
     }
 
+    public NoOpTerminalVisitor(final Graph graph, final VariableResolver variableResolver) {
+        super(graph, variableResolver);
+    }
+
+    public NoOpTerminalVisitor(final String traversalSourceName, final Graph graph,
+                               final Supplier<GraphTraversal<?,?>> createAnonymous,
+                               final GraphTraversalSource g, final VariableResolver variableResolver) {
+        super(traversalSourceName, graph, createAnonymous, g, variableResolver);
+    }
+
     /**
-     * Returns {@link Bytecode} of {@link Traversal} or {@link GraphTraversalSource}, overriding any terminal step
+     * Returns {@link GremlinLang} of {@link Traversal} or {@link GraphTraversalSource}, overriding any terminal step
      * operations to prevent them from being executed using the {@link TraversalTerminalMethodVisitor} to append
-     * terminal operations to bytecode.
+     * terminal operations to GremlinLang.
      *
      * @param ctx - the parse tree
-     * @return - bytecode from the traversal or traversal source
+     * @return - gremlinLang from the traversal or traversal source
      */
     @Override
     public Object visitQuery(final GremlinParser.QueryContext ctx){
@@ -51,7 +65,7 @@ public class NoOpTerminalVisitor extends GremlinAntlrToJava {
             if (firstChild instanceof GremlinParser.TraversalSourceContext) {
                 if (childCount == 1) {
                     // handle traversalSource
-                    return gvisitor.visitTraversalSource((GremlinParser.TraversalSourceContext)firstChild).getBytecode();
+                    return gvisitor.visitTraversalSource((GremlinParser.TraversalSourceContext)firstChild).getGremlinLang();
                 } else {
                     // handle traversalSource DOT transactionPart
                     throw new GremlinParserException("Transaction operation is not supported yet");
@@ -63,7 +77,7 @@ public class NoOpTerminalVisitor extends GremlinAntlrToJava {
                 if (childCount == 1) {
                     // handle rootTraversal
                     return tvisitor.visitRootTraversal(
-                            (GremlinParser.RootTraversalContext)firstChild).asAdmin().getBytecode();
+                            (GremlinParser.RootTraversalContext)firstChild).asAdmin().getGremlinLang();
                 } else {
                     // handle rootTraversal DOT traversalTerminalMethod
                     // could not keep all of these methods in one visitor due to the need of the terminal visitor to have a traversal,

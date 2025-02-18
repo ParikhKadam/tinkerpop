@@ -21,15 +21,139 @@ image::https://raw.githubusercontent.com/apache/tinkerpop/master/docs/static/ima
 
 *Tinkerheart*
 
+== TinkerPop 3.6.8
+
+*Release Date: October 23, 2024*
+
+Please see the link:https://github.com/apache/tinkerpop/blob/3.6.8/CHANGELOG.asciidoc#release-3-6-8[changelog] for a
+complete list of all the modifications that are part of this release.
+
+=== Upgrading for Users
+
+==== Runtime Updates
+
+`gremlin-python` has upgraded to Python 3.9 as Python 3.8 has passed end of life.
+`gremlin-go` has upgraded to Go 1.22 as Go 1.21 has passed end of life.
+
+
+== TinkerPop 3.6.7
+
+*Release Date: April 8, 2024*
+
+Please see the link:https://github.com/apache/tinkerpop/blob/3.6.7/CHANGELOG.asciidoc#release-3-6-7[changelog] for a
+complete list of all the modifications that are part of this release.
+
+=== Upgrading for Users
+
+==== Runtime Version Upgrades
+`gremlin-javascript` and `gremlint` have upgraded from Node 16 to Node 18 as Node 16 has passed end of life.
+`gremlin-go` has upgraded from Go 1.20 to Go 1.21 as Go 1.20 has passed end of life.
+
+==== Gremlin.Net: Fixed a bug in traversal enumeration on .NET 8
+
+The behavior of `IEnumerable` was changed in .NET 8 when `Current` was accessed on it before starting the enumeration
+via `MoveNext()`.
+The Gremlin.Net driver unfortunately did exactly that in some cases which led to exceptions
+(`InvalidOperationException: Enumeration has not started. Call MoveNext.`) on .NET 8 for some traversals.
+Traversal enumeration has been changed for this version of Gremlin.Net to avoid this problem.
+
+Older platforms than .NET 8 are not affected as `IEnumerable.Current` returned `null` there which is what the
+Gremlin.Net driver expected.
+
+See: link:https://issues.apache.org/jira/browse/TINKERPOP-3029[TINKERPOP-3029]
+
+
+== TinkerPop 3.6.6
+
+*Release Date: November 20, 2023*
+
+Please see the link:https://github.com/apache/tinkerpop/blob/3.6.6/CHANGELOG.asciidoc#release-3-6-6[changelog] for a
+complete list of all the modifications that are part of this release.
+
+=== Upgrading for Providers
+
+The `HttpGremlinRequestEncoder` constructor has been deprecated in favor of one with an additional parameter `boolean userAgentEnabled`.
+User agent HTTP headers can now be encoded if this flag is enabled.
+
+== TinkerPop 3.6.5
+
+*Release Date: July 31, 2023*
+
+Please see the link:https://github.com/apache/tinkerpop/blob/3.6.5/CHANGELOG.asciidoc#release-3.6.5[changelog] for a complete list of all the modifications that are part of this release.
+
+=== Upgrading for Users
+
+==== HTTP Plain Text
+
+A `text/plain` MIME type has been added to the HTTP endpoint to return Gremlin Console formatted results in plain text.
+This format can be helpful for a variety of reasons. Reading JSON formatted results can be difficult sometimes and
+`text/plain` is a more simple, readable representation for when that is helpful.
+
+[source,text]
+----
+$ curl -H "Accept:text/plain" -X POST -d "{\"gremlin\":\"g.V()\"}" "http://localhost:8182"
+==>v[1]
+==>v[2]
+==>v[3]
+==>v[4]
+==>v[5]
+==>v[6]
+----
+
+See: link:https://issues.apache.org/jira/browse/TINKERPOP-2947[TINKERPOP-2947]
+
+==== Untyped GraphSON
+
+Prior to GraphSON 3.0, there were options to have GraphSON returned with and without types. The latter was helpful
+for getting a more simple to process JSON format that relied strictly on the JSON type system. This format was of
+course lossy in nature and not conducive for use with the language variants that were developing as the primary
+mechanism for working with Gremlin. Of course, simple HTTP never really went away and forcing the type system on
+consumers makes that route of connecting harder than it should be.
+
+With HTTP users in mind, this version brings back both versions of untyped GraphSON by adding the following mime types:
+
+* GraphSON 1.0 - `application/vnd.gremlin-v1.0+json;types=false`
+* GraphSON 2.0 - `application/vnd.gremlin-v2.0+json;types=false`
+
+Neither is configured by default in Gremlin Server, but can be added if desired by editing the Gremlin Server
+configuration file.
+
+See: link:https://issues.apache.org/jira/browse/TINKERPOP-2965[TINKERPOP-2965]
+
+== TinkerPop 3.6.4
+
+*Release Date: May 12, 2023*
+
+Please see the link:https://github.com/apache/tinkerpop/blob/3.6.4/CHANGELOG.asciidoc#release-3-6-4[changelog] for a complete list of all the modifications that are part of this release.
+
 == TinkerPop 3.6.3
 
-*Release Date: NOT OFFICIALLY RELEASED YET*
+*Release Date: May 1, 2023*
 
 Please see the link:https://github.com/apache/tinkerpop/blob/3.6.3/CHANGELOG.asciidoc#release-3-6-3[changelog] for a complete list of all the modifications that are part of this release.
 
 === Upgrading for Users
 
+==== Deprecation Warning for Go 1.17
 
+Release 3.6.3 will be one of the last versions of 3.6.x to use Go 1.17 for `gremlin-go` as this runtime is no longer supported.
+Upcoming releases of `gremlin-go` will attempt to use the latest available version of Go.
+
+=== Upgrading for Providers
+
+==== Graph System Providers
+
+===== Writing and Deleting Extension to Mutating Interface
+
+`Writing` and `Deleting` are two new interfaces that extend `Mutating`. These two interfaces can be used to distinguish
+whether a `Step` that implements `Mutating` will cause a write or a delete. A mapping has also been added that maps a
+`Bytecode` instruction to possible steps. By using these two changes in conjunction, you can tell if a traversal will
+change the underlying graph by calling `BytecodeHelper.findPossibleTraversalSteps()` on each `Bytecode` instruction of
+the traversal. Be aware that there are a small number of special steps (e.g. `io()` or `call()`) that aren't marked
+with these interfaces even though they could potentially modify the graph as they can't implement the current
+`Mutating` interface which brings in the `Event` subsystem.
+
+See: link:https://issues.apache.org/jira/browse/TINKERPOP-2929[TINKERPOP-2929]
 
 == TinkerPop 3.6.2
 
@@ -219,8 +343,8 @@ possible it would be best to migrate away from it as graph providers ramp up on 
 write optimizations that will make a big difference in performance.
 
 See: link:https://issues.apache.org/jira/browse/TINKERPOP-2681[TINKERPOP-2681],
-link:https://tinkerpop.apache.org/docs/3.6.0/reference/#mergee-step[mergeE()-step],
-link:https://tinkerpop.apache.org/docs/3.6.0/reference/#mergev-step[mergeV()-step]
+link:https://tinkerpop.apache.org/docs/3.6.0/reference/#mergeedge-step[mergeE()-step],
+link:https://tinkerpop.apache.org/docs/3.6.0/reference/#mergevertex-step[mergeV()-step]
 
 ==== Direction Aliases
 
@@ -618,7 +742,7 @@ See: link:https://issues.apache.org/jira/browse/TINKERPOP-2652[TINKERPOP-2652]
 ==== gremlin-annotations
 
 There is a new module called `gremlin-annotations` and it holds the annotations used to construct
-link:https://tinkerpop.apache.org/docs/x.y.z/reference/#gremlin-java-dsl[Java-based Gremlin DSLs]. These annotations
+link:https://tinkerpop.apache.org/docs/3.6.0/reference/#gremlin-java-dsl[Java-based Gremlin DSLs]. These annotations
 were formerly in `gremlin-core` and therefore it will be necessary to modify dependencies accordingly when upgrading
 to 3.6.0. Package and class names have remained the same and general usage is unchanged.
 

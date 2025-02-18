@@ -20,9 +20,9 @@
 package org.apache.tinkerpop.gremlin.driver.remote;
 
 import org.apache.tinkerpop.gremlin.GraphProvider;
-import org.apache.tinkerpop.gremlin.util.ser.Serializers;
 import org.apache.tinkerpop.gremlin.structure.Graph;
 import org.apache.tinkerpop.gremlin.tinkergraph.process.computer.TinkerGraphComputer;
+import org.apache.tinkerpop.gremlin.util.ser.Serializers;
 
 /**
  * @author Stephen Mallette (http://stephen.genoprime.com)
@@ -128,6 +128,14 @@ import org.apache.tinkerpop.gremlin.tinkergraph.process.computer.TinkerGraphComp
         method = "g_V_hasXk_withinXcXX_valuesXkX",
         reason = "Requires some test data initialization with addV()")
 @Graph.OptOut(
+        test = "org.apache.tinkerpop.gremlin.process.traversal.step.filter.HasTest",
+        method = "g_V_hasXname_regexXTinkerXX",
+        reason = "Requires some test data initialization with addV()")
+@Graph.OptOut(
+        test = "org.apache.tinkerpop.gremlin.process.traversal.step.filter.HasTest",
+        method = "g_V_hasXname_regexXTinkerUnicodeXX",
+        reason = "Requires some test data initialization with addV()")
+@Graph.OptOut(
         test = "org.apache.tinkerpop.gremlin.process.traversal.step.map.PathTest",
         method = "g_injectX1_null_nullX_path",
         reason = "The inject() step is not supported by GraphComputer")
@@ -135,10 +143,14 @@ import org.apache.tinkerpop.gremlin.tinkergraph.process.computer.TinkerGraphComp
         test = "org.apache.tinkerpop.gremlin.process.traversal.step.map.PathTest",
         method = "g_injectX1_null_nullX_path_dedup",
         reason = "The inject() step is not supported by GraphComputer")
+@Graph.OptOut(
+        test = "org.apache.tinkerpop.gremlin.process.traversal.step.map.MatchTest$GreedyMatchTraversals",
+        method = "*",
+        reason = "MatchAlgorithmStrategy construction doesn't work for gremlin-groovy")
 @GraphProvider.Descriptor(computer = TinkerGraphComputer.class)
 public class GraphBinaryRemoteGraphComputerProvider extends AbstractRemoteGraphProvider {
 
     public GraphBinaryRemoteGraphComputerProvider() {
-        super(createClusterBuilder(Serializers.GRAPHBINARY_V1D0).create(), true);
+        super(createClusterBuilder(Serializers.GRAPHBINARY_V4).create(), true, "groovy-test");
     }
 }

@@ -80,7 +80,7 @@ memory manipulations).
 ----
 result = graph.compute().program(PageRankVertexProgram.build().create()).submit().get()
 result.memory().runtime
-g = traversal().withEmbedded(result.graph())
+g = traversal().with(result.graph())
 g.V().elementMap()
 ----
 
@@ -137,7 +137,7 @@ that the property is "hidden" unless it is directly accessed via name.
 graph = TinkerFactory.createModern()
 result = graph.compute().program(PeerPressureVertexProgram.build().create()).mapReduce(ClusterPopulationMapReduce.build().create()).submit().get()
 result.memory().get('clusterPopulation')
-g = traversal().withEmbedded(result.graph())
+g = traversal().with(result.graph())
 g.V().values(PeerPressureVertexProgram.CLUSTER).groupCount().next()
 g.V().elementMap()
 ----
@@ -367,7 +367,7 @@ The above `PageRankVertexProgram` is used as follows.
 ----
 result = graph.compute().program(PageRankVertexProgram.build().create()).submit().get()
 result.memory().runtime
-g = traversal().withEmbedded(result.graph())
+g = traversal().with(result.graph())
 g.V().elementMap()
 ----
 
@@ -375,7 +375,7 @@ Note that `GraphTraversal` provides a <<pagerank-step,`pageRank()`>>-step.
 
 [gremlin-groovy,modern]
 ----
-g = traversal().withEmbedded(graph).withComputer()
+g = traversal().with(graph).withComputer()
 g.V().pageRank().elementMap()
 g.V().pageRank().
         with(PageRank.propertyName, 'pageRank').
@@ -403,7 +403,7 @@ Note that `GraphTraversal` provides a <<peerpressure-step,`peerPressure()`>>-ste
 
 [gremlin-groovy,modern]
 ----
-g = traversal().withEmbedded(graph).withComputer()
+g = traversal().with(graph).withComputer()
 g.V().peerPressure().with(PeerPressure.propertyName, 'cluster').elementMap()
 g.V().peerPressure().
         with(PeerPressure.edges,outE('knows')).
@@ -503,9 +503,9 @@ link:https://dzone.com/articles/local-and-distributed-graph[Local and Distribute
 
 [gremlin-groovy,modern]
 ----
-g = traversal().withEmbedded(graph)
+g = traversal().with(graph)
 g.V().both().hasLabel('person').values('age').groupCount().next() // OLTP
-g = traversal().withEmbedded(graph).withComputer()
+g = traversal().with(graph).withComputer()
 g.V().both().hasLabel('person').values('age').groupCount().next() // OLAP
 ----
 
@@ -589,14 +589,16 @@ Most OLAP jobs do not require the entire source graph to faithfully execute thei
 ----
 graph.computer().
   vertices(hasLabel("person")).
+  vertexProperties(__.properties("name")).
   edges(bothE("knows")).
   program(PageRankVertexProgram...)
 ----
 
-There are two methods for constructing a `GraphFilter`.
+There are three methods for constructing a `GraphFilter`.
 
 * `vertices(Traversal<Vertex,Vertex>)`: A traversal that will be used that can only analyze a vertex and its properties.
 If the traversal `hasNext()`, the input `Vertex` is passed to the `GraphComputer`.
+* `vertexProperties(Traversal<Vertex, ? extends Property<?>)`: A traversal that will either let the vertex property pass or not.
 * `edges(Traversal<Vertex,Edge>)`: A traversal that will iterate all legal edges for the source vertex.
 
 `GraphFilter` is a "push-down predicate" that providers can reason on to determine the most efficient way to provide

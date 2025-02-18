@@ -19,7 +19,9 @@ under the License.
 
 package gremlingo
 
-import "math/big"
+import (
+	"math/big"
+)
 
 // Traverser is the objects propagating through the traversal.
 type Traverser struct {
@@ -74,7 +76,7 @@ func (t *Traversal) Iterate() <-chan error {
 			return
 		}
 
-		if err := t.Bytecode.AddStep("none"); err != nil {
+		if err := t.Bytecode.AddStep("discard"); err != nil {
 			r <- err
 			return
 		}
@@ -151,6 +153,36 @@ var Cardinality = cardinalities{
 	Single: "single",
 	List:   "list",
 	Set:    "set",
+}
+
+type cv struct {
+	Bytecode *Bytecode
+}
+
+type CardValue interface {
+	Single(val interface{}) Bytecode
+	Set(val interface{}) Bytecode
+	List(val interface{}) Bytecode
+}
+
+var CardinalityValue CardValue = &cv{}
+
+func (*cv) Single(val interface{}) Bytecode {
+	bc := Bytecode{}
+	bc.AddSource("CardinalityValueTraversal", Cardinality.Single, val)
+	return bc
+}
+
+func (*cv) Set(val interface{}) Bytecode {
+	bc := Bytecode{}
+	bc.AddSource("CardinalityValueTraversal", Cardinality.Set, val)
+	return bc
+}
+
+func (*cv) List(val interface{}) Bytecode {
+	bc := Bytecode{}
+	bc.AddSource("CardinalityValueTraversal", Cardinality.List, val)
+	return bc
 }
 
 type column string
@@ -269,6 +301,38 @@ var T = ts{
 	Value: "value",
 }
 
+type materializeProperties struct {
+	All    string
+	Tokens string
+}
+
+// MaterializeProperties is string symbols.
+var MaterializeProperties = materializeProperties{
+	All:    "all",
+	Tokens: "tokens",
+}
+
+type dt string
+
+type dts struct {
+	// time period second
+	Second dt
+	// time period minute
+	Minute dt
+	// time period hour
+	Hour dt
+	// time period day
+	Day dt
+}
+
+// Merge is a set of operations for Vertex and Edge merging.
+var DT = dts{
+	Second: "second",
+	Minute: "minute",
+	Hour:   "hour",
+	Day:    "day",
+}
+
 type merge string
 
 type merges struct {
@@ -286,8 +350,8 @@ type merges struct {
 var Merge = merges{
 	OnCreate: "onCreate",
 	OnMatch:  "onMatch",
-	OutV:  "outV",
-	InV:  "inV",
+	OutV:     "outV",
+	InV:      "inV",
 }
 
 type operator string
@@ -443,14 +507,23 @@ func (*p) Test(args ...interface{}) Predicate {
 	return newP("test", args...)
 }
 
+func convertArguments(args []interface{}) []interface{} {
+	if len(args) == 1 {
+		if asArray, ok := args[0].([]interface{}); ok {
+			return asArray
+		}
+	}
+	return args
+}
+
 // Within Predicate determines if value is within given list of values.
 func (*p) Within(args ...interface{}) Predicate {
-	return newP("within", args...)
+	return newP("within", convertArguments(args)...)
 }
 
 // Without Predicate determines if value is not within the specified.
 func (*p) Without(args ...interface{}) Predicate {
-	return newP("without", args...)
+	return newP("without", convertArguments(args)...)
 }
 
 // And Predicate returns a Predicate composed of two predicates (logical AND of them).
@@ -578,6 +651,25 @@ var WithOptions = withOptions{
 	Indexer: "~tinkerpop.index.indexer",
 	List:    0,
 	Map:     1,
+}
+
+type io struct {
+	Graphson string
+	Gryo     string
+	Graphml  string
+	Reader   string
+	Writer   string
+	Registry string
+}
+
+// IO holds configuration options to be passed to the GraphTraversal.io.
+var IO = io{
+	Graphson: "graphson",
+	Gryo:     "gryo",
+	Graphml:  "graphml",
+	Reader:   "~tinkerpop.io.reader",
+	Writer:   "~tinkerpop.io.writer",
+	Registry: "~tinkerpop.io.registry",
 }
 
 // Metrics holds metrics data; typically for .profile()-step analysis. Metrics may be nested. Nesting enables

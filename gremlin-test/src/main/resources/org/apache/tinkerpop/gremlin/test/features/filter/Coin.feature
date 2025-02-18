@@ -34,6 +34,23 @@ Feature: Step - coin()
       | v[ripple] |
       | v[peter]  |
 
+  Scenario: g_V_coinX1varX
+    Given the modern graph
+    And using the parameter xx1 defined as "d[1.0].d"
+    And the traversal of
+      """
+      g.V().coin(xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[marko] |
+      | v[vadas] |
+      | v[lop] |
+      | v[josh] |
+      | v[ripple] |
+      | v[peter]  |
+
   Scenario: g_V_coinX0X
     Given the modern graph
     And the traversal of
@@ -44,13 +61,13 @@ Feature: Step - coin()
     Then the result should be empty
 
   @GraphComputerVerificationStrategyNotSupported @WithSeedStrategy
-  Scenario: g_withStrategiesXSeedStrategyX_V_coinX50X
+  Scenario: g_withStrategiesXSeedStrategyX_V_order_byXnameX_coinX50X
     Given the modern graph
     And the traversal of
       """
-      g.withStrategies(new SeedStrategy(seed: 999999)).V().coin(0.5)
+      g.withStrategies(new SeedStrategy(seed: 999999)).V().order().by("name").coin(0.5)
       """
     When iterated to list
     Then the result should be unordered
       | result |
-      | v[marko] |
+      | v[josh] |

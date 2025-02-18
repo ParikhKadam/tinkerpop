@@ -262,6 +262,7 @@ namespace Gremlin.Net.Process.Traversal
         ///     <see cref="GraphTraversal{SType, EType}" />.
         /// </param>
         /// <returns>A <see cref="GraphTraversalSource" /> configured to use the provided <see cref="IRemoteConnection" />.</returns>
+        [Obsolete("Prefer use of AnonymousTraversalSource.with().", false)]
         public GraphTraversalSource WithRemote(IRemoteConnection remoteConnection) =>
             new GraphTraversalSource(new List<ITraversalStrategy>(TraversalStrategies),
                 new Bytecode(Bytecode), remoteConnection);
@@ -520,6 +521,19 @@ namespace Gremlin.Net.Process.Traversal
         {
             var traversal = new GraphTraversal<TStart, TStart>(TraversalStrategies, new Bytecode(Bytecode));
             traversal.Bytecode.AddStep("call", service, m, t);
+            return traversal;
+        }
+
+        /// <summary>
+        ///     Spawns a <see cref="GraphTraversal{SType, EType}" /> off this graph traversal source and adds the union step to that
+        ///     traversal.
+        /// </summary>
+        public GraphTraversal<TStart, TStart> Union<TStart>(params ITraversal[] unionTraversals)
+        {
+            var traversal = new GraphTraversal<TStart, TStart>(TraversalStrategies, new Bytecode(Bytecode));
+            var args = new List<object>(unionTraversals.Length);
+            args.AddRange(unionTraversals);
+            traversal.Bytecode.AddStep("union", args.ToArray());
             return traversal;
         }
 

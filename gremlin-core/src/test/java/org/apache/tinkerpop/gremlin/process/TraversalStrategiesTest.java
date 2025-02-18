@@ -30,8 +30,10 @@ import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.AbstractTraversalStrategy;
 import org.apache.tinkerpop.gremlin.structure.Edge;
 import org.apache.tinkerpop.gremlin.structure.Graph;
+import org.apache.tinkerpop.gremlin.structure.Property;
 import org.apache.tinkerpop.gremlin.structure.Transaction;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -58,6 +60,14 @@ import static org.junit.Assert.fail;
  */
 public class TraversalStrategiesTest {
 
+    @Before
+    public void setup() {
+        TraversalStrategies.GlobalCache.registerStrategies(TestGraph.class,
+                TraversalStrategies.GlobalCache.getStrategies(Graph.class).clone().addStrategies(new StrategyA(), new StrategyB()));
+        TraversalStrategies.GlobalCache.registerStrategies(TestGraphComputer.class,
+                TraversalStrategies.GlobalCache.getStrategies(GraphComputer.class).clone().addStrategies(new StrategyC()));
+    }
+    
     @Test
     public void shouldAllowUserManipulationOfGlobalCache() {
         ///////////
@@ -128,11 +138,6 @@ public class TraversalStrategiesTest {
 
     public static class TestGraphComputer implements GraphComputer {
 
-        static {
-            TraversalStrategies.GlobalCache.registerStrategies(TestGraphComputer.class,
-                    TraversalStrategies.GlobalCache.getStrategies(GraphComputer.class).clone().addStrategies(new StrategyC()));
-        }
-
         @Override
         public GraphComputer result(ResultGraph resultGraph) {
             return this;
@@ -169,17 +174,17 @@ public class TraversalStrategiesTest {
         }
 
         @Override
+        public GraphComputer vertexProperties(Traversal<Vertex, ? extends Property<?>> vertexPropertyFilter) {
+            return this;
+        }
+
+        @Override
         public Future<ComputerResult> submit() {
             return new CompletableFuture<>();
         }
     }
 
     public static class TestGraph implements Graph {
-
-        static {
-            TraversalStrategies.GlobalCache.registerStrategies(TestGraph.class,
-                    TraversalStrategies.GlobalCache.getStrategies(Graph.class).clone().addStrategies(new StrategyA(), new StrategyB()));
-        }
 
         @Override
         public Vertex addVertex(Object... keyValues) {

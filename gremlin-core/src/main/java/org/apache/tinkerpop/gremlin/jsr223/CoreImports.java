@@ -30,6 +30,8 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
+import org.apache.tinkerpop.gremlin.language.translator.GremlinTranslator;
+import org.apache.tinkerpop.gremlin.language.translator.Translator;
 import org.apache.tinkerpop.gremlin.process.computer.Computer;
 import org.apache.tinkerpop.gremlin.process.computer.ComputerResult;
 import org.apache.tinkerpop.gremlin.process.computer.GraphComputer;
@@ -50,10 +52,13 @@ import org.apache.tinkerpop.gremlin.process.computer.traversal.step.map.PageRank
 import org.apache.tinkerpop.gremlin.process.computer.traversal.step.map.PeerPressure;
 import org.apache.tinkerpop.gremlin.process.computer.traversal.step.map.ShortestPath;
 import org.apache.tinkerpop.gremlin.process.computer.traversal.strategy.decoration.VertexProgramStrategy;
+import org.apache.tinkerpop.gremlin.process.computer.traversal.strategy.finalization.ComputerFinalizationStrategy;
 import org.apache.tinkerpop.gremlin.process.computer.traversal.strategy.optimization.GraphFilterStrategy;
+import org.apache.tinkerpop.gremlin.process.computer.traversal.strategy.optimization.MessagePassingReductionStrategy;
 import org.apache.tinkerpop.gremlin.process.computer.traversal.strategy.verification.VertexProgramRestrictionStrategy;
 import org.apache.tinkerpop.gremlin.process.remote.RemoteConnection;
-import org.apache.tinkerpop.gremlin.process.traversal.Bindings;
+import org.apache.tinkerpop.gremlin.process.traversal.AnonymousTraversalSource;
+import org.apache.tinkerpop.gremlin.process.traversal.DT;
 import org.apache.tinkerpop.gremlin.process.traversal.IO;
 import org.apache.tinkerpop.gremlin.process.traversal.Merge;
 import org.apache.tinkerpop.gremlin.process.traversal.Operator;
@@ -64,9 +69,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.Pop;
 import org.apache.tinkerpop.gremlin.process.traversal.SackFunctions;
 import org.apache.tinkerpop.gremlin.process.traversal.Scope;
 import org.apache.tinkerpop.gremlin.process.traversal.TextP;
-import org.apache.tinkerpop.gremlin.process.traversal.Translator;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
-import org.apache.tinkerpop.gremlin.process.traversal.AnonymousTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
@@ -76,33 +79,34 @@ import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.Connec
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.ElementIdStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.EventStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.HaltedTraverserStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.OptionsStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.PartitionStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.SeedStrategy;
-import org.apache.tinkerpop.gremlin.process.traversal.strategy.finalization.ReferenceElementStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.SubgraphStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.finalization.MatchAlgorithmStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.finalization.ProfileStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.finalization.ReferenceElementStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.AdjacentToIncidentStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.ByModulatorOptimizationStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.CountStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.EarlyLimitStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.FilterRankingStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.IdentityRemovalStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.IncidentToAdjacentStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.InlineFilterStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.LazyBarrierStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.MatchPredicateStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.OrderLimitStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathProcessorStrategy;
-import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.CountStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.ProductiveByStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.RepeatUnrollStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.ComputerVerificationStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.EdgeLabelVerificationStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.LambdaRestrictionStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.ReadOnlyStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.ReservedKeysVerificationStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.verification.StandardVerificationStrategy;
-import org.apache.tinkerpop.gremlin.process.traversal.translator.DotNetTranslator;
-import org.apache.tinkerpop.gremlin.process.traversal.translator.GroovyTranslator;
-import org.apache.tinkerpop.gremlin.process.traversal.translator.JavascriptTranslator;
-import org.apache.tinkerpop.gremlin.process.traversal.translator.PythonTranslator;
 import org.apache.tinkerpop.gremlin.process.traversal.util.TraversalMetrics;
 import org.apache.tinkerpop.gremlin.structure.Column;
 import org.apache.tinkerpop.gremlin.structure.Direction;
@@ -130,8 +134,8 @@ import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONTokens;
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONVersion;
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONWriter;
 import org.apache.tinkerpop.gremlin.structure.io.graphson.LegacyGraphSONReader;
-import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoClassResolverV1d0;
-import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoClassResolverV3d0;
+import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoClassResolverV1;
+import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoClassResolverV3;
 import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoIo;
 import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoMapper;
 import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoReader;
@@ -196,6 +200,7 @@ public final class CoreImports {
         CLASS_IMPORTS.add(VertexProperty.Cardinality.class);
         CLASS_IMPORTS.add(Column.class);
         CLASS_IMPORTS.add(Direction.class);
+        CLASS_IMPORTS.add(DT.class);
         CLASS_IMPORTS.add(Merge.class);
         CLASS_IMPORTS.add(Operator.class);
         CLASS_IMPORTS.add(Order.class);
@@ -228,8 +233,8 @@ public final class CoreImports {
         CLASS_IMPORTS.add(GraphSONVersion.class);
         CLASS_IMPORTS.add(GraphSONWriter.class);
         CLASS_IMPORTS.add(LegacyGraphSONReader.class);
-        CLASS_IMPORTS.add(GryoClassResolverV1d0.class);
-        CLASS_IMPORTS.add(GryoClassResolverV3d0.class);
+        CLASS_IMPORTS.add(GryoClassResolverV1.class);
+        CLASS_IMPORTS.add(GryoClassResolverV3.class);
         CLASS_IMPORTS.add(GryoIo.class);
         CLASS_IMPORTS.add(GryoMapper.class);
         CLASS_IMPORTS.add(GryoReader.class);
@@ -249,10 +254,15 @@ public final class CoreImports {
         CLASS_IMPORTS.add(Configurations.class);
         // strategies
         CLASS_IMPORTS.add(ConnectiveStrategy.class);
+        CLASS_IMPORTS.add(ComputerFinalizationStrategy.class);
         CLASS_IMPORTS.add(ElementIdStrategy.class);
         CLASS_IMPORTS.add(EventStrategy.class);
         CLASS_IMPORTS.add(HaltedTraverserStrategy.class);
+        CLASS_IMPORTS.add(InlineFilterStrategy.class);
+        CLASS_IMPORTS.add(MessagePassingReductionStrategy.class);
+        CLASS_IMPORTS.add(OptionsStrategy.class);
         CLASS_IMPORTS.add(PartitionStrategy.class);
+        CLASS_IMPORTS.add(ReservedKeysVerificationStrategy.class);
         CLASS_IMPORTS.add(SubgraphStrategy.class);
         CLASS_IMPORTS.add(LazyBarrierStrategy.class);
         CLASS_IMPORTS.add(MatchAlgorithmStrategy.class);
@@ -270,8 +280,10 @@ public final class CoreImports {
         CLASS_IMPORTS.add(PathProcessorStrategy.class);
         CLASS_IMPORTS.add(ComputerVerificationStrategy.class);
         CLASS_IMPORTS.add(LambdaRestrictionStrategy.class);
+        CLASS_IMPORTS.add(PathRetractionStrategy.class);
         CLASS_IMPORTS.add(ReadOnlyStrategy.class);
         CLASS_IMPORTS.add(ReferenceElementStrategy.class);
+        CLASS_IMPORTS.add(RepeatUnrollStrategy.class);
         CLASS_IMPORTS.add(SeedStrategy.class);
         CLASS_IMPORTS.add(StandardVerificationStrategy.class);
         CLASS_IMPORTS.add(EdgeLabelVerificationStrategy.class);
@@ -283,13 +295,6 @@ public final class CoreImports {
         CLASS_IMPORTS.add(GraphTraversalSource.class);
         CLASS_IMPORTS.add(Traversal.class);
         CLASS_IMPORTS.add(TraversalMetrics.class);
-        CLASS_IMPORTS.add(Translator.class);
-        CLASS_IMPORTS.add(DotNetTranslator.class);
-        CLASS_IMPORTS.add(GroovyTranslator.class);
-        CLASS_IMPORTS.add(JavaTranslator.class);
-        CLASS_IMPORTS.add(JavascriptTranslator.class);
-        CLASS_IMPORTS.add(PythonTranslator.class);
-        CLASS_IMPORTS.add(Bindings.class);
         // graph computer
         CLASS_IMPORTS.add(Computer.class);
         CLASS_IMPORTS.add(ComputerResult.class);
@@ -320,6 +325,8 @@ public final class CoreImports {
         CLASS_IMPORTS.add(java.util.Date.class);
         CLASS_IMPORTS.add(java.sql.Timestamp.class);
         CLASS_IMPORTS.add(java.util.UUID.class);
+        CLASS_IMPORTS.add(GremlinTranslator.class);
+        CLASS_IMPORTS.add(Translator.class);
 
         /////////////
         // METHODS //
@@ -335,6 +342,7 @@ public final class CoreImports {
         uniqueMethods(Lambda.class).forEach(METHOD_IMPORTS::add);
         try {
             METHOD_IMPORTS.add(DatetimeHelper.class.getMethod("datetime", String.class));
+            METHOD_IMPORTS.add(DatetimeHelper.class.getMethod("datetime"));
         } catch (Exception ex) {
             throw new IllegalStateException("Could not load datetime() function to imports");
         }
@@ -347,6 +355,7 @@ public final class CoreImports {
         Collections.addAll(ENUM_IMPORTS, VertexProperty.Cardinality.values());
         Collections.addAll(ENUM_IMPORTS, Column.values());
         Collections.addAll(ENUM_IMPORTS, Direction.values());
+        Collections.addAll(ENUM_IMPORTS, DT.values());
         Collections.addAll(ENUM_IMPORTS, Merge.values());
         Collections.addAll(ENUM_IMPORTS, Operator.values());
         Collections.addAll(ENUM_IMPORTS, Order.values());

@@ -18,12 +18,16 @@
  */
 package org.apache.tinkerpop.gremlin.tinkergraph.structure;
 
+import org.apache.tinkerpop.gremlin.jsr223.GremlinLangScriptEngine;
+import org.apache.tinkerpop.gremlin.jsr223.VariableResolverCustomizer;
+import org.apache.tinkerpop.gremlin.language.grammar.VariableResolver;
 import org.apache.tinkerpop.gremlin.process.computer.Computer;
+import org.apache.tinkerpop.gremlin.process.traversal.P;
+import org.apache.tinkerpop.gremlin.process.traversal.Scope;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
-import org.apache.tinkerpop.gremlin.process.traversal.step.util.WithOptions;
 import org.apache.tinkerpop.gremlin.process.traversal.step.util.event.ConsoleMutationListener;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.EventStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.optimization.PathRetractionStrategy;
@@ -38,6 +42,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.script.Bindings;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -251,7 +256,6 @@ public class TinkerGraphPlayTest {
     }
 
     @Test
-    @Ignore
     public void testPlay6() throws Exception {
         final Graph graph = TinkerGraph.open();
         final GraphTraversalSource g = graph.traversal();
@@ -270,16 +274,54 @@ public class TinkerGraphPlayTest {
     }
 
     @Test
-    @Ignore
-    public void testBugs() {
+    public void testBugs() throws Exception {
         final GraphTraversalSource g = TinkerFactory.createModern().traversal();
-        Object o1 = g.V().map(__.V(1));
-        System.out.println(g.V().as("a").both().as("b").dedup("a", "b").by(T.label).select("a", "b").explain());
-        System.out.println(g.V().as("a").both().as("b").dedup("a", "b").by(T.label).select("a", "b").toList());
+        final GremlinLangScriptEngine se = new GremlinLangScriptEngine(
+                new VariableResolverCustomizer(VariableResolver.DefaultVariableResolver::new));
 
-        Traversal<?,?> t =
-                g.V("3").
-                        union(__.repeat(out().simplePath()).times(2).count(),
-                                __.repeat(in().simplePath()).times(2).count());
+        final Bindings b = se.createBindings();
+        b.put("g", g);
+        System.out.println(((GraphTraversal) se.eval("g.V().coin(0.5).count()", b)).toList());
+
+        b.clear();
+        b.put("g", g);
+        b.put("x", 0.5d);
+        System.out.println(((GraphTraversal) se.eval("g.V().coin(x).count()", b)).toList());
+
+        b.clear();
+        b.put("g", g);
+        b.put("x", "josh");
+        b.put("y", 32);
+        System.out.println(((GraphTraversal) se.eval("g.V().has('name', x).has('age', y).count()", b)).toList());
+    }
+
+    @Test
+    @Ignore
+    public void WithinTest() {
+        final int count = 500;
+
+        final Graph graph = TinkerGraph.open();
+        final GraphTraversalSource g = graph.traversal();
+        for (int i = 0; i < count; i++) {
+            graph.addVertex(T.label, "person", T.id, i);
+        }
+
+        graph.vertices().forEachRemaining(a -> {
+            graph.vertices().forEachRemaining(b -> {
+                if (a != b && ((int) a.id() < 2 || (int) b.id() < 2)) {
+                    a.addEdge("knows", b);
+                }
+            });
+        });
+
+        final long start = System.currentTimeMillis();
+
+        final List result = g.
+                V().has(T.id,P.lt(count/2)).aggregate("v1").
+                V().where(P.without("v1")).
+                toList();
+
+        System.out.println(result.size());
+        System.out.printf("Done in %10d %n", System.currentTimeMillis() - start);
     }
 }

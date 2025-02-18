@@ -29,6 +29,7 @@ import org.apache.tinkerpop.gremlin.hadoop.structure.HadoopGraph;
 import org.apache.tinkerpop.gremlin.hadoop.structure.io.gryo.GryoInputFormat;
 import org.apache.tinkerpop.gremlin.process.computer.GraphComputer;
 import org.apache.tinkerpop.gremlin.process.computer.ranking.pagerank.PageRankVertexProgram;
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
 import org.apache.tinkerpop.gremlin.spark.AbstractSparkTest;
 import org.apache.tinkerpop.gremlin.spark.process.computer.SparkGraphComputer;
 import org.apache.tinkerpop.gremlin.spark.process.computer.SparkHadoopGraphProvider;
@@ -50,6 +51,23 @@ import static org.junit.Assert.assertTrue;
  * @author Marko A. Rodriguez (http://markorodriguez.com)
  */
 public class SparkTest extends AbstractSparkTest {
+    @Test
+    public void testCustomizedSparkAppName() {
+	final String appName = "SparkAppNameTest";
+	final org.apache.spark.SparkConf sparkConfiguration = new org.apache.spark.SparkConf();
+	sparkConfiguration.set("spark.app.name", appName);
+	sparkConfiguration.set("spark.master", "local[4]");
+	final org.apache.spark.SparkContext sparkContext = Spark.create(sparkConfiguration);
+	assertEquals(appName, sparkContext.getConf().get("spark.app.name"));
+    }
+
+    @Test
+    public void testDefaultSparkAppName() {
+	final org.apache.spark.SparkConf sparkConfiguration = new org.apache.spark.SparkConf();
+	sparkConfiguration.set("spark.master", "local[4]");
+	final org.apache.spark.SparkContext sparkContext = Spark.create(sparkConfiguration);
+	assertEquals(Spark.DEFAULT_APP_NAME, sparkContext.getConf().get("spark.app.name"));
+    }
 
     @Test
     public void testSparkRDDPersistence() throws Exception {
@@ -60,7 +78,7 @@ public class SparkTest extends AbstractSparkTest {
 
         configuration.setProperty("spark.serializer", GryoSerializer.class.getCanonicalName());
         configuration.setProperty(Graph.GRAPH, HadoopGraph.class.getName());
-        configuration.setProperty(Constants.GREMLIN_HADOOP_INPUT_LOCATION, TestFiles.PATHS.get("tinkerpop-modern-v3d0.kryo"));
+        configuration.setProperty(Constants.GREMLIN_HADOOP_INPUT_LOCATION, TestFiles.PATHS.get("tinkerpop-modern-v3.kryo"));
         configuration.setProperty(Constants.GREMLIN_HADOOP_GRAPH_READER, GryoInputFormat.class.getCanonicalName());
         configuration.setProperty(Constants.GREMLIN_HADOOP_GRAPH_WRITER, PersistedOutputRDD.class.getCanonicalName());
         configuration.setProperty(Constants.GREMLIN_HADOOP_JARS_IN_DISTRIBUTED_CACHE, false);
@@ -71,7 +89,10 @@ public class SparkTest extends AbstractSparkTest {
             assertEquals(i, Spark.getRDDs().size());
             configuration.setProperty(Constants.GREMLIN_HADOOP_OUTPUT_LOCATION, prefix + i);
             Graph graph = GraphFactory.open(configuration);
-            graph.compute(SparkGraphComputer.class).persist(GraphComputer.Persist.VERTEX_PROPERTIES).program(PageRankVertexProgram.build().iterations(1).create(graph)).submit().get();
+            graph.compute(SparkGraphComputer.class)
+                .persist(GraphComputer.Persist.VERTEX_PROPERTIES)
+                .vertexProperties(__.properties("dummy"))
+                .program(PageRankVertexProgram.build().iterations(1).create(graph)).submit().get();
             assertNotNull(Spark.getRDD(graphRDDName));
             assertEquals(i + 1, Spark.getRDDs().size());
         }

@@ -18,7 +18,7 @@
  */
 package org.apache.tinkerpop.gremlin.process.traversal.lambda;
 
-import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
+import org.apache.tinkerpop.gremlin.process.traversal.GremlinLang;
 import org.apache.tinkerpop.gremlin.process.traversal.Step;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalSideEffects;
@@ -61,8 +61,8 @@ public abstract class AbstractLambdaTraversal<S, E> implements Traversal.Admin<S
     }
 
     @Override
-    public Bytecode getBytecode() {
-        return null == this.bypassTraversal ? new Bytecode() : this.bypassTraversal.getBytecode();
+    public GremlinLang getGremlinLang() {
+        return null == this.bypassTraversal ? new GremlinLang() : this.bypassTraversal.getGremlinLang();
     }
 
 
@@ -168,6 +168,11 @@ public abstract class AbstractLambdaTraversal<S, E> implements Traversal.Admin<S
     @Override
     public boolean isLocked() {
         return null == this.bypassTraversal || this.bypassTraversal.isLocked();
+    }
+
+    @Override
+    public void lock() {
+       if (this.bypassTraversal != null) bypassTraversal.lock();
     }
 
     /**

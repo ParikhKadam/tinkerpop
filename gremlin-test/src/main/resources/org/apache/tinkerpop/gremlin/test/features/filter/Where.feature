@@ -92,11 +92,10 @@ Feature: Step - where()
 
   Scenario: g_withSideEffectXa_josh_peterX_VX1X_outXcreatedX_inXcreatedX_name_whereXwithinXaXX
     Given the modern graph
-    And using the parameter xx1 defined as "l[josh,peter]"
     And using the parameter vid1 defined as "v[marko].id"
     And the traversal of
       """
-      g.withSideEffect("a", xx1).V(vid1).out("created").in("created").values("name").where(P.within("a"))
+      g.withSideEffect("a", ["josh","peter"]).V(vid1).out("created").in("created").values("name").where(P.within("a"))
       """
     When iterated to list
     Then the result should be unordered
@@ -360,3 +359,52 @@ Feature: Step - where()
       | lop |
       | lop |
       | ripple |
+
+  Scenario: g_V_asXnX_whereXorXhasLabelXsoftwareX_hasLabelXpersonXXX_selectXnX_byXnameX
+    Given the modern graph
+    And the traversal of
+      """
+      g.V().as("n").where(
+        __.or(__.hasLabel("software"), __.hasLabel("person"))
+      ).select("n").by("name")
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | marko |
+      | vadas |
+      | josh |
+      | peter |
+      | lop |
+      | ripple |
+
+  @GraphComputerVerificationStarGraphExceeded
+  Scenario: g_V_asXnX_whereXorXselectXnX_hasLabelXsoftwareX_selectXnX_hasLabelXpersonXXX_selectXnX_byXnameX
+    Given the modern graph
+    And the traversal of
+      """
+      g.V().as("n").
+        where(__.or(__.select("n").hasLabel("software"), __.select("n").hasLabel("person"))).
+        select("n").by("name")
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | marko |
+      | vadas |
+      | josh |
+      | peter |
+      | lop |
+      | ripple |
+
+  Scenario: g_V_hasLabelXpersonX_asXxX_whereXinEXknowsX_count_isXgteX1XXX_selectXxX
+    Given the modern graph
+    And the traversal of
+      """
+      g.V().hasLabel("person").as("x").where(__.inE("knows").count().is(P.gte(1))).select("x")
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[vadas] |
+      | v[josh] |

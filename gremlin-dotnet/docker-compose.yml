@@ -15,8 +15,6 @@
 #    specific language governing permissions and limitations
 #    under the License.
 
-version: "3.8"
-
 services:
 
   gremlin-server-test-dotnet:
@@ -47,7 +45,7 @@ services:
 
   gremlin-dotnet-integration-tests:
     container_name: gremlin-dotnet-integration-tests
-    image: mcr.microsoft.com/dotnet/sdk:6.0
+    image: mcr.microsoft.com/dotnet/sdk:8.0
     volumes:
       - .:/gremlin-dotnet
       - ../gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/test/features:/gremlin-test/src/main/resources/org/apache/tinkerpop/gremlin/test/features
@@ -55,10 +53,10 @@ services:
       - ../gremlin-tools/gremlin-socket-server/conf:/gremlin-dotnet/gremlin-socket-server/conf/
     environment:
       - DOCKER_ENVIRONMENT=true
-      - TEST_TRANSACTIONS=true
     working_dir: /gremlin-dotnet
     command: >
-      bash -c "dotnet test ./Gremlin.Net.sln -c Release"
+      bash -c "dotnet test ./Gremlin.Net.sln -c Release;
+      EXIT_CODE=$$?; chown -R `stat -c "%u:%g" .` .; exit $$EXIT_CODE"
     depends_on:
       gremlin-server-test-dotnet:
         condition: service_healthy

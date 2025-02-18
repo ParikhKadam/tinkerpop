@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -359,12 +360,20 @@ public final class StarGraph implements Graph, Serializable {
             super(id, label);
         }
 
+        private void dropEdgeProperty(Object id) {
+            if (edgeProperties != null) {
+                edgeProperties.remove(id);
+            }
+        }
+
         public void dropEdges(final Direction direction) {
             if ((direction.equals(Direction.OUT) || direction.equals(Direction.BOTH)) && null != this.outEdges) {
+                this.outEdges.values().forEach(edges -> edges.forEach(edge -> dropEdgeProperty(edge.id())));
                 this.outEdges.clear();
                 this.outEdges = null;
             }
             if ((direction.equals(Direction.IN) || direction.equals(Direction.BOTH)) && null != this.inEdges) {
+                this.inEdges.values().forEach(edges -> edges.forEach(edge -> dropEdgeProperty(edge.id())));
                 this.inEdges.clear();
                 this.inEdges = null;
             }
@@ -372,12 +381,14 @@ public final class StarGraph implements Graph, Serializable {
 
         public void dropEdges(final Direction direction, final String edgeLabel) {
             if (null != this.outEdges && (direction.equals(Direction.OUT) || direction.equals(Direction.BOTH))) {
+                this.outEdges.get(edgeLabel).forEach(edge -> dropEdgeProperty(edge.id()));
                 this.outEdges.remove(edgeLabel);
 
                 if (this.outEdges.isEmpty())
                     this.outEdges = null;
             }
             if (null != this.inEdges && (direction.equals(Direction.IN) || direction.equals(Direction.BOTH))) {
+                this.inEdges.get(edgeLabel).forEach(edge -> dropEdgeProperty(edge.id()));
                 this.inEdges.remove(edgeLabel);
 
                 if (this.inEdges.isEmpty())
@@ -574,6 +585,13 @@ public final class StarGraph implements Graph, Serializable {
                         else
                             this.inEdges = inEdges;
                     }
+                }
+                if (graphFilter.hasVertexPropertyFilter()) {
+                    Set<String> retainSet = new HashSet<>();
+                    graphFilter.legalVertexProperties(this).forEachRemaining(property -> {
+                        retainSet.add(property.key());
+                    });
+                    this.vertexProperties.keySet().removeIf(key -> !retainSet.contains(key));
                 }
                 return Optional.of(this);
             } else {

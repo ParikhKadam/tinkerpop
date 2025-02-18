@@ -42,7 +42,7 @@ Feature: Step - hasLabel()
       | e[marko-knows->vadas] |
       | e[marko-knows->josh] |
 
-  @MultiMetaProperties
+  @MultiProperties @MetaProperties
   Scenario: g_E_hasLabelXuses_traversesX
     Given the crew graph
     And the traversal of
@@ -78,6 +78,23 @@ Feature: Step - hasLabel()
       | v[lop] |
       | v[ripple] |
 
+  Scenario: g_V_hasLabelXperson_softwarevarX
+    Given the modern graph
+    And using the parameter xx1 defined as "software"
+    And the traversal of
+    """
+    g.V().hasLabel("person",xx1)
+    """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[marko] |
+      | v[vadas] |
+      | v[josh] |
+      | v[peter] |
+      | v[lop] |
+      | v[ripple] |
+
   Scenario: g_V_hasLabelXpersonX_hasLabelXsoftwareX
     Given the modern graph
     And the traversal of
@@ -86,6 +103,46 @@ Feature: Step - hasLabel()
     """
     When iterated to list
     Then the result should be empty
+
+  Scenario: g_V_hasLabelXpersonvarX_hasLabelXsoftwareX
+    Given the modern graph
+    And using the parameter xx1 defined as "person"
+    And the traversal of
+    """
+    g.V().hasLabel(xx1).hasLabel("software")
+    """
+    When iterated to list
+    Then the result should be empty
+
+  Scenario: g_V_hasLabelXpersonvar_softwarevarX
+    Given the modern graph
+    And using the parameter xx1 defined as "person"
+    And using the parameter xx2 defined as "software"
+    And the traversal of
+    """
+    g.V().hasLabel(xx1,xx2)
+    """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[marko] |
+      | v[vadas] |
+      | v[josh] |
+      | v[peter] |
+      | v[lop] |
+      | v[ripple] |
+
+  Scenario: g_V_hasLabelXpersonX_hasXage_notXlteX10X_andXnotXbetweenX11_20XXXX_andXltX29X_orXeqX35XXXX_name
+    Given the modern graph
+    And the traversal of
+    """
+    g.V().hasLabel("person").has("age", P.not(P.lte(10).and(P.not(P.between(11, 20)))).and(P.lt(29).or(P.eq(35)))).values("name")
+    """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | vadas |
+      | peter |
 
   Scenario: g_V_hasLabelXnullX
     Given the modern graph

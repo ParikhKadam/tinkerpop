@@ -21,7 +21,7 @@ limitations under the License.
     <parent>
         <groupId>org.apache.tinkerpop</groupId>
         <artifactId>tinkerpop</artifactId>
-        <version>3.7.0-SNAPSHOT</version>
+        <version>4.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>gremlin-driver</artifactId>
     <name>Apache TinkerPop :: Gremlin Driver</name>
@@ -50,6 +50,36 @@ limitations under the License.
             <artifactId>logback-classic</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>http-auth-aws</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>http-client-spi</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>http-auth-spi</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>auth</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>utils</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>protocol-core</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
         <!-- TinkerGraph is an optional dependency that is only required if doing deserialization of Graph instances -->
         <dependency>
             <groupId>org.apache.tinkerpop</groupId>
@@ -61,12 +91,6 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.tinkerpop</groupId>
             <artifactId>gremlin-test</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.tinkerpop</groupId>
-            <artifactId>gremlin-socket-server</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -153,23 +177,15 @@ limitations under the License.
                             <shadedClassifierName>shaded</shadedClassifierName>
                             <artifactSet>
                                 <!-- exclude logging stuff from uberjar - shading prevents proper logger initialization -->
-                                <!-- exclude groovy as it's only needed for json serialization and is an optional dependency -->
                                 <excludes>
-                                    <exclude>ch.qos.logback:logback-classic</exclude>
+                                    <exclude>ch.qos.logback:*</exclude>
                                     <exclude>org.slf4j:slf4j-api</exclude>
-                                    <exclude>org.slf4j:jcl-over-slf4j</exclude>
-                                    <exclude>org.codehaus.groovy:groovy</exclude>
-                                    <exclude>org.codehaus.groovy:groovy-json</exclude>
                                 </excludes>
                             </artifactSet>
                             <relocations>
                                 <relocation>
                                     <pattern>com.carrotsearch</pattern>
                                     <shadedPattern>com.shaded.carrotsearch</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.jcabi</pattern>
-                                    <shadedPattern>com.shaded.jcabi</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.squareup</pattern>
@@ -206,6 +222,11 @@ limitations under the License.
                                         <resource>NOTICE.txt</resource>
                                         <resource>NOTICE</resource>
                                         <resource>licenses</resource>
+                                        <!--Exclude kryo, minlog and bigint licenses to avoid conflict as they are included in
+                                            both gremlin-shaded and gremlin-driver-->
+                                        <resource>META-INF/licenses/kryo</resource>
+                                        <resource>META-INF/licenses/minlog</resource>
+                                        <resource>META-INF/licenses/bigint</resource>
                                     </resources>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
@@ -217,14 +238,6 @@ limitations under the License.
                                     <file>src/main/static/NOTICE</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/licenses/jcabi-log</resource>
-                                    <file>src/main/static/licenses/jcabi-log</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                                    <resource>META-INF/licenses/jcabi-manifests</resource>
-                                    <file>src/main/static/licenses/jcabi-manifests</file>
-                                </transformer>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/licenses/kryo</resource>
                                     <file>src/main/static/licenses/kryo</file>
                                 </transformer>
@@ -232,7 +245,23 @@ limitations under the License.
                                     <resource>META-INF/licenses/minlog</resource>
                                     <file>src/main/static/licenses/minlog</file>
                                 </transformer>
-                            </transformers>>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/bigint</resource>
+                                    <file>src/main/static/licenses/bigint</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/logback</resource>
+                                    <file>src/main/static/licenses/logback</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/slf4j</resource>
+                                    <file>src/main/static/licenses/slf4j</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/licenses/antlr4</resource>
+                                    <file>src/main/static/licenses/antlr4</file>
+                                </transformer>
+                            </transformers>
                         </configuration>
                     </execution>
                 </executions>
@@ -258,6 +287,15 @@ limitations under the License.
                         <id>verify-performance-test</id>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>examples/**</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

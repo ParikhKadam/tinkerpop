@@ -19,11 +19,10 @@
 package org.apache.tinkerpop.gremlin.driver;
 
 import org.apache.tinkerpop.benchmark.util.AbstractBenchmarkBase;
-import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
+import org.apache.tinkerpop.gremlin.process.traversal.GremlinLang;
 import org.apache.tinkerpop.gremlin.structure.Graph;
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONMapper;
 import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONVersion;
-import org.apache.tinkerpop.gremlin.structure.io.graphson.GraphSONXModuleV3d0;
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph;
 import org.apache.tinkerpop.shaded.jackson.databind.ObjectMapper;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -46,26 +45,26 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class GraphSONMapperBenchmark extends AbstractBenchmarkBase {
     private static final ObjectMapper mapper = GraphSONMapper.build()
             .version(GraphSONVersion.V3_0)
-            .addCustomModule(GraphSONXModuleV3d0.build().create(false))
+            .addDefaultXModule(true)
             .create().createMapper();
 
     @State(Scope.Thread)
     public static class BenchmarkState {
 
-        public byte[] bytecodeBytes1;
-        private byte[] bytecodeBytes2;
-        private final Bytecode bytecode1 = new Bytecode();
-        private Bytecode bytecode2;
+        public byte[] gremlinBytes1;
+        private byte[] gremlinBytes2;
+        private final GremlinLang gremlinLang1 = new GremlinLang();
+        private GremlinLang gremlinLang2;
 
         @Setup(Level.Trial)
         public void doSetup() throws IOException {
-            bytecode1.addStep("V");
-            bytecode1.addStep("values", "name");
-            bytecode1.addStep("tail", 5);
+            gremlinLang1.addStep("V");
+            gremlinLang1.addStep("values", "name");
+            gremlinLang1.addStep("tail", 5);
 
             Graph g = TinkerGraph.open();
 
-            bytecode2 = g.traversal()
+            gremlinLang2 = g.traversal()
                     .addV("person")
                     .property("name1", 1)
                     .property("name2", UUID.randomUUID())
@@ -73,11 +72,11 @@ public class GraphSONMapperBenchmark extends AbstractBenchmarkBase {
                     .property("name4", BigInteger.valueOf(33343455342245L))
                     .property("name5", "kjlkdnvlkdrnvldnvndlrkvnlhkjdkgkrtnlkndblknlknonboirnlkbnrtbonrobinokbnrklnbkrnblktengotrngotkrnglkt")
                     .property("name6", Instant.now())
-                    .asAdmin().getBytecode();
+                    .asAdmin().getGremlinLang();
 
 
-            bytecodeBytes1 = mapper.writeValueAsBytes(bytecode1);
-            bytecodeBytes2 = mapper.writeValueAsBytes(bytecode2);
+            gremlinBytes1 = mapper.writeValueAsBytes(gremlinLang1);
+            gremlinBytes2 = mapper.writeValueAsBytes(gremlinLang2);
         }
 
         @TearDown(Level.Trial)
@@ -87,21 +86,21 @@ public class GraphSONMapperBenchmark extends AbstractBenchmarkBase {
 
     @Benchmark
     public void readBytecode1(BenchmarkState state) throws IOException {
-        mapper.readValue(state.bytecodeBytes1, Bytecode.class);
+        mapper.readValue(state.gremlinBytes1, GremlinLang.class);
     }
 
     @Benchmark
     public void readBytecode2(BenchmarkState state) throws IOException {
-        mapper.readValue(state.bytecodeBytes2, Bytecode.class);
+        mapper.readValue(state.gremlinBytes2, GremlinLang.class);
     }
 
     @Benchmark
     public void writeBytecode1(BenchmarkState state) throws IOException {
-        mapper.writeValueAsString(state.bytecode1);
+        mapper.writeValueAsString(state.gremlinLang1);
     }
 
     @Benchmark
     public void writeBytecode2(BenchmarkState state) throws IOException {
-        mapper.writeValueAsBytes(state.bytecode2);
+        mapper.writeValueAsBytes(state.gremlinLang2);
     }
 }

@@ -125,12 +125,27 @@ public abstract class GremlinValueComparator implements Comparator<Object> {
          */
         @Override
         public boolean equals(final Object f, final Object s) {
+            // numbers and collections with different hashcode can be equal
+            if (f != null && s != null && f.hashCode() != s.hashCode()
+                    && !(f instanceof Number) && !(f instanceof Collection) && !(f instanceof Map))
+                return false;
+
             // shortcut a long, drawn out element by element comparison
             if (containersOfDifferentSize(f, s))
                 return false;
 
+            // For Compare, NaN always produces ERROR
+            if (eitherAreNaN(f, s))
+                return false;
+
+            // For Compare we do not cross type boundaries, including null
+            if (!comparable(f, s))
+                return false;
+
             try {
-                return this.compare(f, s) == 0;
+                // comparable(f, s) assures that type(f) == type(s)
+                final Type type = Type.type(f);
+                return comparator(type).compare(f, s) == 0;
             } catch (GremlinTypeErrorException ex) {
                 /**
                  * By routing through the compare(f, s) path we expose ourselves to type errors, which should be
@@ -345,7 +360,7 @@ public abstract class GremlinValueComparator implements Comparator<Object> {
         put(Type.MapEntry,       entryComparator);
         put(Type.Unknown,        unknownTypeComparator);
     }};
-    
+
     private GremlinValueComparator() {}
 
     protected Comparator comparator(final Type type) {

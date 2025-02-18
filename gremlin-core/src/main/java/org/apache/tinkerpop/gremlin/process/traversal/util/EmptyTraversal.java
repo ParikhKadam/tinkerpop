@@ -18,7 +18,7 @@
  */
 package org.apache.tinkerpop.gremlin.process.traversal.util;
 
-import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
+import org.apache.tinkerpop.gremlin.process.traversal.GremlinLang;
 import org.apache.tinkerpop.gremlin.process.traversal.Step;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalSideEffects;
@@ -53,8 +53,8 @@ public final class EmptyTraversal<S, E> implements Traversal.Admin<S, E> {
 
     }
 
-    public Bytecode getBytecode() {
-        return new Bytecode();
+    public GremlinLang getGremlinLang() {
+        return new GremlinLang();
     }
 
     @Override
@@ -110,6 +110,11 @@ public final class EmptyTraversal<S, E> implements Traversal.Admin<S, E> {
     @Override
     public boolean isLocked() {
         return true;
+    }
+
+    @Override
+    public void lock() {
+        // nothing to do here as this type of traversal is always in a locked state
     }
 
     @Override

@@ -19,15 +19,17 @@
 package org.apache.tinkerpop.gremlin.console
 
 import groovy.transform.ThreadInterrupt
+import org.apache.groovy.groovysh.Command
+import org.apache.groovy.groovysh.Groovysh
+import org.apache.groovy.groovysh.ParseCode
+import org.apache.groovy.groovysh.Parser
+import org.apache.groovy.groovysh.util.CommandArgumentParser
+import org.apache.groovy.groovysh.util.ScriptVariableAnalyzer
 import org.apache.tinkerpop.gremlin.console.commands.GremlinSetCommand
 import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.MultipleCompilationErrorsException
 import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
-import org.codehaus.groovy.tools.shell.Command
-import org.codehaus.groovy.tools.shell.Groovysh
 import org.codehaus.groovy.tools.shell.IO
-import org.codehaus.groovy.tools.shell.ParseCode
-import org.codehaus.groovy.tools.shell.Parser
-import org.codehaus.groovy.tools.shell.util.CommandArgumentParser
 
 /**
  * Overrides the posix style parsing of Groovysh allowing for commands to parse prior to Groovy 2.4.x.
@@ -45,6 +47,8 @@ class GremlinGroovysh extends Groovysh {
         super(io, compilerConfig)
         this.mediator = mediator
     }
+
+    public CompilerConfiguration getCompilerConfiguration() { return compilerConfig }
 
     protected List parseLine(final String line) {
         assert line != null
@@ -79,63 +83,9 @@ class GremlinGroovysh extends Groovysh {
         mediator.evaluating.set(true)
 
         try {
-            if (mediator.localEvaluation)
-                return super.execute(line)
-            else {
-                assert line != null
-                if (line.trim().size() == 0) {
-                    return null
-                }
-
-                maybeRecordInput(line)
-
-                Object result
-
-                if (isExecutable(line)) {
-                    result = executeCommand(line)
-                    if (result != null) setLastResult(result)
-                    return result
-                }
-
-                List<String> current = new ArrayList<String>(buffers.current())
-                current << line
-
-                // determine if this script is complete or not - if not it's a multiline script
-                def status = parser.parse(current)
-
-                switch (status.code) {
-                    case ParseCode.COMPLETE:
-                        // concat script here because commands don't support multi-line
-                        def script = String.join(Parser.getNEWLINE(), current)
-                        setLastResult(mediator.currentRemote().submit([script]))
-                        buffers.clearSelected()
-                        break
-                    case ParseCode.INCOMPLETE:
-                        buffers.updateSelected(current)
-                        break
-                    case ParseCode.ERROR:
-                        throw status.cause
-                    default:
-                        // Should never happen
-                        throw new Error("Invalid parse status: $status.code")
-                }
-
-                return result
-            }
+            return super.execute(line)
         } finally {
             mediator.evaluating.set(false)
         }
-    }
-
-    private void setLastResult(final Object result) {
-        if (resultHook == null) {
-            throw new IllegalStateException('Result hook is not set')
-        }
-
-        resultHook.call((Object)result)
-
-        interp.context['_'] = result
-
-        maybeRecordResult(result)
     }
 }

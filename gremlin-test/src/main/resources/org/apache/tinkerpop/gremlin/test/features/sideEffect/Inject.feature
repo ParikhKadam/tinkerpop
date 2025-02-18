@@ -18,6 +18,7 @@
 @StepClassSideEffect @StepInject
 Feature: Step - inject()
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_VX1X_out_injectXv2X_name
     Given the modern graph
     And using the parameter vid1 defined as "v[marko].id"
@@ -34,7 +35,7 @@ Feature: Step - inject()
       | vadas |
       | josh  |
 
-
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_VX1X_out_name_injectXdanielX_asXaX_mapXlengthX_path
     Given the modern graph
     And using the parameter vid1 defined as "v[marko].id"
@@ -69,8 +70,9 @@ Feature: Step - inject()
       | vadas |
       | josh  |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectXnull_1_3_nullX
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject(null, 1, 3, null)
@@ -83,8 +85,9 @@ Feature: Step - inject()
       | d[3].i |
       | null |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectX10_20_null_20_10_10X_groupCountXxX_dedup_asXyX_projectXa_bX_by_byXselectXxX_selectXselectXyXXX
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject(10,20,null,20,10,10).groupCount("x").dedup().as("y").project("a","b").by().by(__.select("x").select(__.select("y")))
@@ -96,8 +99,9 @@ Feature: Step - inject()
       | m[{"a":"d[20].i", "b":"d[2].l"}] |
       | m[{"a":null, "b":"d[1].l"}] |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectXname_marko_age_nullX_selectXname_ageX
-    Given the empty graph
+    Given the modern graph
     And using the parameter xx1 defined as "m[{\"name\":\"marko\", \"age\":null}]"
     And the traversal of
       """
@@ -108,8 +112,9 @@ Feature: Step - inject()
       | result |
       | m[{"name":"marko", "age":null}] |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectXnull_nullX
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject(null, null)
@@ -120,8 +125,9 @@ Feature: Step - inject()
       | null |
       | null |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectXnullX
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject(null)
@@ -131,8 +137,9 @@ Feature: Step - inject()
       | result |
       | null |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_inject
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject()
@@ -140,6 +147,7 @@ Feature: Step - inject()
     When iterated to list
     Then the result should be empty
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_VX1X_valuesXageX_injectXnull_nullX
     Given the modern graph
     And using the parameter xx1 defined as "v[marko].id"
@@ -181,8 +189,9 @@ Feature: Step - inject()
       | result |
       | d[29].i |
 
+  @GraphComputerVerificationInjectionNotSupported
   Scenario: g_injectXnull_1_3_nullX_asXaX_selectXaX
-    Given the empty graph
+    Given the modern graph
     And the traversal of
       """
       g.inject(null, 1, 3, null).as("a").select("a")
@@ -194,3 +203,125 @@ Feature: Step - inject()
       | d[1].i |
       | d[3].i |
       | null |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_3X_injectX100_300X
+    Given the modern graph
+    And the traversal of
+      """
+      g.inject(1, 3).inject(100, 300)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | d[100].i |
+      | d[300].i |
+      | d[1].i |
+      | d[3].i |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1var_3varX_injectX100var_300varX
+    Given the modern graph
+    And using the parameter xx1 defined as "d[1].i"
+    And using the parameter xx2 defined as "d[3].i"
+    And using the parameter xx3 defined as "d[100].i"
+    And using the parameter xx4 defined as "d[300].i"
+    And the traversal of
+      """
+      g.inject(xx1, xx2).inject(xx3, xx4)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | d[100].i |
+      | d[300].i |
+      | d[1].i |
+      | d[3].i |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_3_100_300X_list
+    Given the modern graph
+    And the traversal of
+      """
+      g.inject([1, 3, 100, 300])
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | l[d[1].i,d[3].i,d[100].i,d[300].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_3_100_300X_listvar
+    Given the modern graph
+    And using the parameter xx1 defined as "l[d[1].i,d[3].i,d[100].i,d[300].i]"
+    And the traversal of
+      """
+      g.inject(xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | l[d[1].i,d[3].i,d[100].i,d[300].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_3_100_300X_set
+    Given the modern graph
+    And the traversal of
+      """
+      g.inject({1, 3, 100, 300})
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | s[d[100].i,d[300].i,d[1].i,d[3].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_3_100_300X_setvar
+    Given the modern graph
+    And using the parameter xx1 defined as "s[d[100].i,d[300].i,d[1].i,d[3].i]"
+    And the traversal of
+      """
+      g.inject(xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | s[d[100].i,d[300].i,d[1].i,d[3].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_1X_set
+    Given the modern graph
+    And the traversal of
+      """
+      g.inject({1, 1})
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | s[d[1].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX1_1X_setvar
+    Given the modern graph
+    And using the parameter xx1 defined as "s[d[1].i,d[1].i]"
+    And the traversal of
+      """
+      g.inject(xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | s[d[1].i] |
+
+  @GraphComputerVerificationInjectionNotSupported
+  Scenario: g_injectX_set
+    Given the modern graph
+    And using the parameter xx1 defined as "s[]"
+    And the traversal of
+      """
+      g.inject(xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | s[] |

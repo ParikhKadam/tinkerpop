@@ -39,7 +39,7 @@ type gorillaTransporter struct {
 	url          string
 	connection   websocketConn
 	isClosed     bool
-	logHandler   logHandler
+	logHandler   *logHandler
 	connSettings *connectionSettings
 	writeChannel chan []byte
 	wg           *sync.WaitGroup
@@ -65,7 +65,8 @@ func (transporter *gorillaTransporter) Connect() (err error) {
 		ReadBufferSize:    transporter.connSettings.readBufferSize,
 		WriteBufferSize:   transporter.connSettings.writeBufferSize,
 	}
-	header := transporter.connSettings.authInfo.getHeader()
+
+	header := transporter.getAuthInfo().GetHeader()
 	if transporter.connSettings.enableUserAgentOnConnect {
 		if header == nil {
 			header = make(http.Header)
@@ -99,11 +100,17 @@ func (transporter *gorillaTransporter) Write(data []byte) error {
 			return err
 		}
 	}
+	if len(data) > transporter.connSettings.writeBufferSize {
+		return newError(err1201RequestSizeExceedsWriteBufferError)
+	}
 	transporter.writeChannel <- data
 	return nil
 }
 
-func (transporter *gorillaTransporter) getAuthInfo() *AuthInfo {
+func (transporter *gorillaTransporter) getAuthInfo() AuthInfoProvider {
+	if transporter.connSettings.authInfo == nil {
+		return NoopAuthInfo
+	}
 	return transporter.connSettings.authInfo
 }
 

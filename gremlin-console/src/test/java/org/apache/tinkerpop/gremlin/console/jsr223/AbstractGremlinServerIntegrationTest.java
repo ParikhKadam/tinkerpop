@@ -24,6 +24,8 @@ import org.junit.After;
 import org.junit.Before;
 
 import java.io.InputStream;
+import java.nio.file.Paths;
+import java.util.Collections;
 
 /**
  * Starts and stops an instance for each executed test.
@@ -31,7 +33,7 @@ import java.io.InputStream;
  * @author Stephen Mallette (http://stephen.genoprime.com)
  */
 public abstract class AbstractGremlinServerIntegrationTest {
-    private GremlinServer server;
+    protected GremlinServer server;
 
     public Settings overrideSettings(final Settings settings) {
         return settings;
@@ -47,6 +49,13 @@ public abstract class AbstractGremlinServerIntegrationTest {
         final Settings settings = Settings.read(stream);
 
         final Settings overridenSettings = overrideSettings(settings);
+        final String prop = Paths.get(AbstractGremlinServerIntegrationTest.class.getResource("tinkergraph-empty.properties").toURI()).toString();
+        overridenSettings.graphs.put("graph", prop);
+        final String script = Paths.get(AbstractGremlinServerIntegrationTest.class.getResource("generate.groovy").toURI()).toString();
+        overridenSettings.scriptEngines.get("gremlin-groovy").plugins
+                .get("org.apache.tinkerpop.gremlin.jsr223.ScriptFileGremlinPlugin")
+                .put("files", Collections.singletonList(script));
+
         this.server = new GremlinServer(overridenSettings);
 
         server.start().join();

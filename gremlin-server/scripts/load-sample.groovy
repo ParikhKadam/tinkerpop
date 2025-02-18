@@ -31,14 +31,16 @@ globals << [hook : [
     ctx.logger.info("Loading graph data from data/sample.kryo.")
 
     // An example of an initialization script that can be configured to run in Gremlin Server.
-    graph.io(GryoIo.build()).readGraph('data/sample.kryo')
+    def gLoader = traversal().withEmbedded(graph)
+    try {
+        gLoader.io('data/sample.kryo').read().iterate()
+    } catch (Exception ex) {
+        ctx.logger.error(ex)
+    } finally {
+        gLoader.close()
+    }
   }
 ] as LifeCycleHook]
 
 // define the default TraversalSource to bind queries to - this one will be named "g".
-// ReferenceElementStrategy converts all graph elements (vertices/edges/vertex properties)
-// to "references" (i.e. just id and label without properties). this strategy was added
-// in 3.4.0 to make all Gremlin Server results consistent across all protocols and
-// serialization formats aligning it with TinkerPop recommended practices for writing
-// Gremlin.
-globals << [g : traversal().withEmbedded(graph).withStrategies(ReferenceElementStrategy)]
+globals << [g : traversal().withEmbedded(graph)]

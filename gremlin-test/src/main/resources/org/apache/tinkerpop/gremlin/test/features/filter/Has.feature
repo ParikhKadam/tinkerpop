@@ -64,6 +64,19 @@ Feature: Step - has()
       | result |
       | v[marko] |
 
+  Scenario: g_VX1X_hasXname_markovarX
+    Given the modern graph
+    And using the parameter vid1 defined as "v[marko].id"
+    And using the parameter xx1 defined as "marko"
+    And the traversal of
+      """
+      g.V(vid1).has("name", xx1)
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[marko] |
+
   Scenario: g_VX2X_hasXname_markoX
     Given the modern graph
     And using the parameter vid1 defined as "v[vadas].id"
@@ -140,6 +153,19 @@ Feature: Step - has()
     When iterated to list
     Then the result should be empty
 
+  Scenario: g_V_hasXpersonvar_age_gt_30X
+    Given the modern graph
+    And using the parameter xx1 defined as "person"
+    And the traversal of
+      """
+      g.V().has(xx1, "age", P.gt(30))
+      """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | v[peter] |
+      | v[josh] |
+
   Scenario: g_VX4X_hasXage_gt_30X
     Given the modern graph
     And using the parameter vid4 defined as "v[josh].id"
@@ -206,6 +232,30 @@ Feature: Step - has()
       | result |
       | d[29].i |
 
+  Scenario: g_V_hasXperson_name_markovarX_age
+    Given the modern graph
+    And using the parameter xx1 defined as "marko"
+    And the traversal of
+    """
+    g.V().has("person", "name", xx1).values("age")
+    """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | d[29].i |
+
+  Scenario: g_V_hasXpersonvar_name_markoX_age
+    Given the modern graph
+    And using the parameter xx1 defined as "person"
+    And the traversal of
+    """
+    g.V().has(xx1, "name", "marko").values("age")
+    """
+    When iterated to list
+    Then the result should be unordered
+      | result |
+      | d[29].i |
+
   Scenario: g_VX1X_outE_hasXweight_inside_0_06X_inV
     Given the modern graph
     And using the parameter vid1 defined as "v[marko].id"
@@ -245,7 +295,7 @@ Feature: Step - has()
       | result |
       | e[josh-created->ripple] |
 
-  @MultiMetaProperties
+  @MultiProperties @MetaProperties
   Scenario: g_V_hasXlocationX
     Given the crew graph
     And the traversal of
@@ -259,18 +309,6 @@ Feature: Step - has()
       | v[matthias] |
       | v[stephen] |
       | v[daniel] |
-
-  Scenario: g_V_hasLabelXpersonX_hasXage_notXlteX10X_andXnotXbetweenX11_20XXXX_andXltX29X_orXeqX35XXXX_name
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().hasLabel("person").has("age", P.not(P.lte(10).and(P.not(P.between(11, 20)))).and(P.lt(29).or(P.eq(35)))).values("name")
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | vadas |
-      | peter |
 
   Scenario: g_V_hasXage_withinX27X_count
     Given the modern graph
@@ -349,70 +387,6 @@ Feature: Step - has()
       | v[vadas] |
       | v[josh] |
       | v[peter] |
-
-
-  Scenario: g_V_both_dedup_properties_hasKeyXageX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().both().properties().dedup().hasKey("age").value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[29].i |
-      | d[27].i |
-      | d[32].i |
-      | d[35].i |
-
-  Scenario: g_V_both_properties_dedup_hasKeyXageX_hasValueXgtX30XX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().both().properties().dedup().hasKey("age").hasValue(P.gt(30)).value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[32].i |
-      | d[35].i |
-
-  Scenario: g_V_bothE_properties_dedup_hasKeyXweightX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().bothE().properties().dedup().hasKey("weight").value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[0.5].d |
-      | d[1.0].d |
-      | d[0.4].d |
-      | d[0.2].d |
-
-  Scenario: g_V_bothE_properties_dedup_hasKeyXweightX_hasValueXltX0d3XX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().bothE().properties().dedup().hasKey("weight").hasValue(P.lt(0.3)).value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[0.2].d |
-
-  Scenario: g_V_hasNotXageX_name
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().hasNot("age").values("name")
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | lop |
-      | ripple |
 
   Scenario: g_V_hasXname_containingXarkXX
     Given the modern graph
@@ -647,24 +621,6 @@ Feature: Step - has()
     When iterated to list
     Then the result should be empty
 
-  Scenario: g_V_hasLabelXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().hasLabel(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_hasXlabel_nullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().has(T.label, null)
-    """
-    When iterated to list
-    Then the result should be empty
-
   Scenario: g_V_hasXlabel_personX
     Given the modern graph
     And the traversal of
@@ -707,148 +663,11 @@ Feature: Step - has()
       | v[josh] |
       | v[peter] |
 
-  Scenario: g_V_hasLabelXnull_nullX
+  Scenario: g_V_hasXname_nullX
     Given the modern graph
     And the traversal of
     """
-    g.V().hasLabel(null, null)
+    g.V().has("name", null)
     """
     When iterated to list
     Then the result should be empty
-
-  Scenario: g_V_hasLabelXnull_personX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().hasLabel(null, "person")
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | v[marko] |
-      | v[vadas] |
-      | v[josh] |
-      | v[peter] |
-
-  Scenario: g_E_hasLabelXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.E().hasLabel(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_E_hasXlabel_nullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.E().has(T.label, null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasLabelXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasLabel(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasKeyXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasKey(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasKeyXnull_nullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasKey(null,null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasKeyXnull_ageX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasKey(null, "age").value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[29].i |
-      | d[27].i |
-      | d[32].i |
-      | d[35].i |
-
-  Scenario: g_E_properties_hasKeyXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.E().properties().hasKey(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_E_properties_hasKeyXnull_nullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.E().properties().hasKey(null,null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_E_properties_hasKeyXnull_weightX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.E().properties().hasKey(null, "weight").value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | d[0.5].d |
-      | d[1.0].d |
-      | d[1.0].d |
-      | d[0.4].d |
-      | d[0.4].d |
-      | d[0.2].d |
-
-  Scenario: g_V_properties_hasValueXnullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasValue(null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasValueXnull_nullX
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasValue(null,null)
-    """
-    When iterated to list
-    Then the result should be empty
-
-  Scenario: g_V_properties_hasValueXnull_joshX_value
-    Given the modern graph
-    And the traversal of
-    """
-    g.V().properties().hasValue(null, "josh").value()
-    """
-    When iterated to list
-    Then the result should be unordered
-      | result |
-      | josh |
-

@@ -537,6 +537,21 @@ namespace Gremlin.Net.UnitTest.Structure.IO.GraphBinary
         }
 
         [Fact]
+        public async Task TestDT()
+        {
+            var expected = DT.Minute;
+            var writer = CreateGraphBinaryWriter();
+            var reader = CreateGraphBinaryReader();
+            var serializationStream = new MemoryStream();
+
+            await writer.WriteAsync(expected, serializationStream);
+            serializationStream.Position = 0;
+            var actual = await reader.ReadAsync(serializationStream);
+
+            Assert.Equal(expected, actual);
+        }
+
+        [Fact]
         public async Task TestMerge()
         {
             var expected = Merge.OnCreate;
@@ -822,7 +837,7 @@ namespace Gremlin.Net.UnitTest.Structure.IO.GraphBinary
             
             Assert.Equal(expected.OperatorName, actual!.OperatorName);
             Assert.Equal(expected.Other, actual.Other);
-            Assert.Equal(expected.Value, actual.Value);
+            Assert.Equal((object[])expected.Value, (object[])actual.Value);
         }
         
         [Fact]

@@ -45,7 +45,10 @@ public class GraphBinaryWriter {
     private final TypeSerializerRegistry registry;
     private final static byte VALUE_FLAG_NULL = 1;
     private final static byte VALUE_FLAG_NONE = 0;
+    private final static byte VALUE_FLAG_ORDERED = 2;
+    private final static byte VALUE_FLAG_BULK = 2;
     public final static byte VERSION_BYTE = (byte)0x81;
+    public final static byte BULKED_BYTE = (byte)0x01;
     private final static byte[] unspecifiedNullBytes = new byte[] { DataType.UNSPECIFIED_NULL.getCodeByte(), 0x01};
     private final static byte[] customTypeCodeBytes = new byte[] { DataType.CUSTOM.getCodeByte() };
 
@@ -102,7 +105,7 @@ public class GraphBinaryWriter {
         if (serializer instanceof TransformSerializer) {
             // For historical reasons, there are types that need to be transformed into another type
             // before serialization, e.g., Map.Entry
-            TransformSerializer<T> transformSerializer = (TransformSerializer<T>) serializer;
+            final TransformSerializer<T> transformSerializer = (TransformSerializer<T>) serializer;
             write(transformSerializer.transform(value), buffer);
             return;
         }
@@ -118,7 +121,7 @@ public class GraphBinaryWriter {
      * <p>Note that for simple types, the provided information will be <code>null</code>.</p>
      */
     public <T> void writeFullyQualifiedNull(final Class<T> objectClass, Buffer buffer, final Object information) throws IOException {
-        TypeSerializer<T> serializer = registry.getSerializer(objectClass);
+        final TypeSerializer<T> serializer = registry.getSerializer(objectClass);
         serializer.write(null, buffer, this);
     }
 
@@ -135,4 +138,19 @@ public class GraphBinaryWriter {
     public void writeValueFlagNone(Buffer buffer) {
         buffer.writeByte(VALUE_FLAG_NONE);
     }
+
+    /**
+     * Writes a single byte with value 2, representing an ordered value_flag.
+     */
+    public void writeValueFlagOrdered(Buffer buffer) {
+        buffer.writeByte(VALUE_FLAG_ORDERED);
+    }
+
+    /**
+     * Writes a single byte with value 2, representing an ordered value_flag.
+     */
+    public void writeValueFlagBulk(Buffer buffer) {
+        buffer.writeByte(VALUE_FLAG_BULK);
+    }
+
 }

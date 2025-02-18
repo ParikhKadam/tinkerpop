@@ -18,14 +18,16 @@
  */
 package org.apache.tinkerpop.gremlin.process.traversal;
 
+import org.apache.tinkerpop.gremlin.process.traversal.step.GValue;
 import org.apache.tinkerpop.gremlin.process.traversal.util.AndP;
 import org.apache.tinkerpop.gremlin.process.traversal.util.OrP;
 
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.function.BiPredicate;
+import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Predefined {@code Predicate} values that can be used to define filters to {@code has()} and {@code where()}.
@@ -35,17 +37,17 @@ import java.util.function.Predicate;
  */
 public class P<V> implements Predicate<V>, Serializable, Cloneable {
 
-    protected BiPredicate<V, V> biPredicate;
+    protected PBiPredicate<V, V> biPredicate;
     protected V value;
     protected V originalValue;
 
-    public P(final BiPredicate<V, V> biPredicate, final V value) {
+    public P(final PBiPredicate<V, V> biPredicate, final V value) {
         this.value = value;
         this.originalValue = value;
         this.biPredicate = biPredicate;
     }
 
-    public BiPredicate<V, V> getBiPredicate() {
+    public PBiPredicate<V, V> getBiPredicate() {
         return this.biPredicate;
     }
 
@@ -56,6 +58,11 @@ public class P<V> implements Predicate<V>, Serializable, Cloneable {
     public V getOriginalValue() {
         return originalValue;
     }
+
+    /*
+     * Get the name of the predicate
+     */
+    public String getPredicateName() { return biPredicate.getPredicateName(); }
 
     /**
      * Gets the current value to be passed to the predicate for testing.
@@ -70,7 +77,12 @@ public class P<V> implements Predicate<V>, Serializable, Cloneable {
 
     @Override
     public boolean test(final V testValue) {
-        return this.biPredicate.test(testValue, this.value);
+        // this might be a bunch of GValue that need to be resolved. zomg
+        if (this.value instanceof List) {
+            return this.biPredicate.test(testValue, (V) ((List) this.value).stream().map(GValue::valueOf).collect(Collectors.toList()));
+        } else {
+            return this.biPredicate.test(testValue, (V) GValue.valueOf(this.value));
+        }
     }
 
     @Override
@@ -253,7 +265,7 @@ public class P<V> implements Predicate<V>, Serializable, Cloneable {
      *
      * @since 3.0.0-incubating
      */
-    public static P test(final BiPredicate biPredicate, final Object value) {
+    public static P test(final PBiPredicate biPredicate, final Object value) {
         return new P(biPredicate, value);
     }
 

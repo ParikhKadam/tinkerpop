@@ -45,6 +45,7 @@ const validHostInvalidPortValidPath = "ws://localhost:12341253/gremlin"
 const invalidHostValidPortValidPath = "ws://invalidhost:8182/gremlin"
 const testServerModernGraphAlias = "gmodern"
 const testServerGraphAlias = "gimmutable"
+const testServerCrewGraphAlias = "gcrew"
 const manualTestSuiteName = "manual"
 const nonRoutableIPForConnectionTimeout = "ws://10.255.255.1/"
 
@@ -91,7 +92,7 @@ func addTestData(t *testing.T, g *GraphTraversalSource) {
 	assert.Nil(t, <-promise)
 }
 
-func getTestGraph(t *testing.T, url string, auth *AuthInfo, tls *tls.Config) *GraphTraversalSource {
+func getTestGraph(t *testing.T, url string, auth AuthInfoProvider, tls *tls.Config) *GraphTraversalSource {
 	remote, err := NewDriverRemoteConnection(url,
 		func(settings *DriverRemoteConnectionSettings) {
 			settings.TlsConfig = tls
@@ -100,12 +101,12 @@ func getTestGraph(t *testing.T, url string, auth *AuthInfo, tls *tls.Config) *Gr
 		})
 	assert.Nil(t, err)
 	assert.NotNil(t, remote)
-	g := Traversal_().WithRemote(remote)
+	g := Traversal_().With(remote)
 
 	return g
 }
 
-func initializeGraph(t *testing.T, url string, auth *AuthInfo, tls *tls.Config) *GraphTraversalSource {
+func initializeGraph(t *testing.T, url string, auth AuthInfoProvider, tls *tls.Config) *GraphTraversalSource {
 	g := getTestGraph(t, url, auth, tls)
 
 	// Drop the graph and check that it is empty.
@@ -815,7 +816,7 @@ func TestConnection(t *testing.T) {
 		// Close remote connection.
 		defer remote.Close()
 
-		g := Traversal_().WithRemote(remote)
+		g := Traversal_().With(remote)
 
 		// Drop the graph and check that it is empty.
 		dropGraph(t, g)
@@ -935,7 +936,7 @@ func TestConnection(t *testing.T) {
 		assert.NotNil(t, remote)
 		defer remote.Close()
 
-		g := Traversal_().WithRemote(remote)
+		g := Traversal_().With(remote)
 
 		r, err := g.V().Count().ToList()
 		assert.Nil(t, err)
@@ -982,7 +983,6 @@ func TestConnection(t *testing.T) {
 				})
 			assert.Nil(t, err)
 			assert.NotNil(t, remote)
-			defer remote.Close()
 
 			session1, _ := remote.CreateSession()
 			assert.NotNil(t, session1.client.session)
@@ -994,6 +994,9 @@ func TestConnection(t *testing.T) {
 			session3, _ := remote.CreateSession()
 			assert.NotNil(t, session3.client.session)
 			assert.Equal(t, 3, len(remote.spawnedSessions))
+
+			remote.Close()
+			assert.Equal(t, 0, len(remote.spawnedSessions))
 		})
 
 		t.Run("Test session failures", func(t *testing.T) {
@@ -1066,7 +1069,7 @@ func TestConnection(t *testing.T) {
 		assert.Nil(t, err)
 		assert.NotNil(t, remote)
 		defer remote.Close()
-		g := Traversal_().WithRemote(remote)
+		g := Traversal_().With(remote)
 
 		r, err := g.V((&Bindings{}).Of("x", 1)).Out("created").Map(&Lambda{Script: "it.get().value('name').length()", Language: ""}).Sum().ToList()
 		assert.Nil(t, err)
@@ -1187,6 +1190,81 @@ func TestConnection(t *testing.T) {
 		// Check error promises.
 		for i, tt := range reqArgsTests {
 			assert.Equal(t, <-gotErrs[i] == nil, tt.nilErr, tt.msg)
+		}
+	})
+
+	t.Run("Get all properties when materializeProperties is all", func(t *testing.T) {
+		skipTestsIfNotEnabled(t, integrationTestSuiteName, testNoAuthEnable)
+
+		g := getModernGraph(t, testNoAuthUrl, &AuthInfo{}, &tls.Config{})
+		defer g.remoteConnection.Close()
+
+		// vertex contains 2 properties, name and age
+		r, err := g.With("materializeProperties", MaterializeProperties.All).V().Has("person", "name", "marko").Next()
+		assert.Nil(t, err)
+
+		AssertMarkoVertexWithProperties(t, r)
+	})
+
+	t.Run("Skip properties when materializeProperties is tokens", func(t *testing.T) {
+		skipTestsIfNotEnabled(t, integrationTestSuiteName, testNoAuthEnable)
+
+		g := getModernGraph(t, testNoAuthUrl, &AuthInfo{}, &tls.Config{})
+		defer g.remoteConnection.Close()
+
+		// vertex contains 2 properties, name and age
+		r, err := g.With("materializeProperties", MaterializeProperties.Tokens).V().Has("person", "name", "marko").Next()
+		assert.Nil(t, err)
+
+		AssertMarkoVertexWithoutProperties(t, r)
+	})
+
+	t.Run("Get all properties when no materializeProperties", func(t *testing.T) {
+		skipTestsIfNotEnabled(t, integrationTestSuiteName, testNoAuthEnable)
+
+		g := getModernGraph(t, testNoAuthUrl, &AuthInfo{}, &tls.Config{})
+		defer g.remoteConnection.Close()
+
+		r, err := g.V().Has("person", "name", "marko").Next()
+		assert.Nil(t, err)
+
+		AssertMarkoVertexWithProperties(t, r)
+	})
+
+	t.Run("Test DriverRemoteConnection Traversal With materializeProperties in Modern Graph", func(t *testing.T) {
+		skipTestsIfNotEnabled(t, integrationTestSuiteName, testNoAuthEnable)
+
+		g := getModernGraph(t, testNoAuthUrl, &AuthInfo{}, &tls.Config{})
+		defer g.remoteConnection.Close()
+
+		vertices, err := g.With("materializeProperties", MaterializeProperties.Tokens).V().ToList()
+		assert.Nil(t, err)
+		for _, res := range vertices {
+			v, _ := res.GetVertex()
+			assert.Nil(t, err)
+			properties, ok := v.Properties.([]interface{})
+			assert.True(t, ok)
+			assert.Equal(t, 0, len(properties))
+		}
+
+		edges, err := g.With("materializeProperties", MaterializeProperties.Tokens).E().ToList()
+		assert.Nil(t, err)
+		for _, res := range edges {
+			e, _ := res.GetEdge()
+			assert.Nil(t, err)
+			properties, ok := e.Properties.([]interface{})
+			assert.True(t, ok)
+			assert.Equal(t, 0, len(properties))
+		}
+
+		vps, err := g.With("materializeProperties", MaterializeProperties.Tokens).V().Properties().ToList()
+		assert.Nil(t, err)
+		for _, res := range vps {
+			vp, _ := res.GetVertexProperty()
+			assert.Nil(t, err)
+			properties, ok := vp.Properties.([]interface{})
+			assert.True(t, ok)
+			assert.Equal(t, 0, len(properties))
 		}
 	})
 }

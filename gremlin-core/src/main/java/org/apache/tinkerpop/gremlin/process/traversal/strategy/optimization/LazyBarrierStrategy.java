@@ -23,16 +23,16 @@ import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.step.Barrier;
 import org.apache.tinkerpop.gremlin.process.traversal.step.PathProcessor;
+import org.apache.tinkerpop.gremlin.process.traversal.step.filter.DiscardStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.filter.DropStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.filter.HasStep;
-import org.apache.tinkerpop.gremlin.process.traversal.step.filter.NoneStep;
+import org.apache.tinkerpop.gremlin.process.traversal.step.map.ElementStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.map.FlatMapStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.map.GraphStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.map.NoOpBarrierStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.map.VertexStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.sideEffect.ProfileSideEffectStep;
 import org.apache.tinkerpop.gremlin.process.traversal.step.util.EmptyStep;
-import org.apache.tinkerpop.gremlin.process.traversal.step.util.ProfileStep;
 import org.apache.tinkerpop.gremlin.process.traversal.strategy.AbstractTraversalStrategy;
 import org.apache.tinkerpop.gremlin.process.traversal.traverser.TraverserRequirement;
 import org.apache.tinkerpop.gremlin.process.traversal.util.TraversalHelper;
@@ -78,12 +78,13 @@ public final class LazyBarrierStrategy extends AbstractTraversalStrategy<Travers
 
     @Override
     public void apply(final Traversal.Admin<?, ?> traversal) {
-        // drop() is a problem for bulked edge/meta properties because of Property equality changes in TINKERPOP-2318
+        // drop()/element() is a problem for bulked edge/meta properties because of Property equality changes in TINKERPOP-2318
         // which made it so that a Property is equal if the key/value is equal. as a result, they bulk together which
         // is fine for almost all cases except when you wish to drop the property.
         if (TraversalHelper.onGraphComputer(traversal) ||
                 traversal.getTraverserRequirements().contains(TraverserRequirement.PATH) ||
-                TraversalHelper.hasStepOfAssignableClass(DropStep.class, traversal))
+                TraversalHelper.hasStepOfAssignableClass(DropStep.class, traversal)||
+                TraversalHelper.hasStepOfAssignableClass(ElementStep.class, traversal))
             return;
 
         boolean foundFlatMap = false;
@@ -112,14 +113,14 @@ public final class LazyBarrierStrategy extends AbstractTraversalStrategy<Travers
                             (i > 0 || ((GraphStep) step).getIds().length >= BIG_START_SIZE ||
                                     (((GraphStep) step).getIds().length == 0 && !(step.getNextStep() instanceof HasStep))))) {
 
-                // NoneStep, EmptyStep signify the end of the traversal where no barriers are really going to be
+                // DiscardStep, EmptyStep signify the end of the traversal where no barriers are really going to be
                 // helpful after that. ProfileSideEffectStep means the traversal had profile() called on it and if
                 // we don't account for that a barrier will inject at the end of the traversal where it wouldn't
                 // be otherwise. LazyBarrierStrategy executes before the finalization strategy of ProfileStrategy
                 // so additionally injected ProfileSideEffectStep instances should not have effect here.
                 if (foundFlatMap && !labeledPath &&
                         !(step.getNextStep() instanceof Barrier) &&
-                        !(step.getNextStep() instanceof NoneStep) &&
+                        !(step.getNextStep() instanceof DiscardStep) &&
                         !(step.getNextStep() instanceof EmptyStep) &&
                         !(step.getNextStep() instanceof ProfileSideEffectStep)) {
                     final Step noOpBarrierStep = new NoOpBarrierStep<>(traversal, MAX_BARRIER_SIZE);

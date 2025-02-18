@@ -86,7 +86,7 @@ func PartitionStrategy(config PartitionStrategyConfig) TraversalStrategy {
 	if config.WritePartition != "" {
 		configMap["writePartition"] = config.WritePartition
 	}
-	if len(config.ReadPartitions) != 0 {
+	if len(config.ReadPartitions.ToSlice()) != 0 {
 		configMap["readPartitions"] = config.ReadPartitions
 	}
 	return &traversalStrategy{name: decorationNamespace + "PartitionStrategy", configuration: configMap}
@@ -97,7 +97,7 @@ func PartitionStrategy(config PartitionStrategyConfig) TraversalStrategy {
 type PartitionStrategyConfig struct {
 	PartitionKey          string
 	WritePartition        string
-	ReadPartitions        []string
+	ReadPartitions        Set
 	IncludeMetaProperties bool
 }
 
@@ -307,9 +307,10 @@ func IdentityRemovalStrategy() TraversalStrategy {
 // IncidentToAdjacentStrategy looks for .OutE().InV(), .InE().OutV() and .BothE().OtherV()
 // and replaces these step sequences with .Out(), .In() or .Both() respectively.
 // The strategy won't modify the traversal if:
-//   the Edge step is labeled
-//   the traversal contains a Path step
-//   the traversal contains a Lambda step
+//
+//	the Edge step is labeled
+//	the traversal contains a Path step
+//	the traversal contains a Lambda step
 func IncidentToAdjacentStrategy() TraversalStrategy {
 	return &traversalStrategy{name: optimizationNamespace + "IncidentToAdjacentStrategy"}
 }
@@ -363,9 +364,11 @@ func PathRetractionStrategy() TraversalStrategy {
 // the initial Traversal argument or null. In this way, the By() is always "productive". This strategy
 // is an "optimization" but it is perhaps more of a "decoration", but it should follow
 // ByModulatorOptimizationStrategy which features optimizations relevant to this one.
-func ProductiveByStrategy(config ProductiveByStrategyConfig) TraversalStrategy {
+func ProductiveByStrategy(config ...ProductiveByStrategyConfig) TraversalStrategy {
 	configMap := make(map[string]interface{})
-	configMap["productiveKeys"] = config.ProductiveKeys
+	if len(config) == 1 {
+		configMap["productiveKeys"] = config[0].ProductiveKeys
+	}
 
 	return &traversalStrategy{name: optimizationNamespace + "ProductiveByStrategy", configuration: configMap}
 }
@@ -379,9 +382,10 @@ type ProductiveByStrategyConfig struct {
 // RepeatUnrollStrategy is an OLTP-only strategy that unrolls any RepeatStep if it uses a constant
 // number of loops (Times(x)) and doesn't emit intermittent elements. If any of the following 3 steps appears
 // within the Repeat-traversal, the strategy will not be applied:
-//   DedupGlobalStep
-//   LoopsStep
-//   LambdaHolder
+//
+//	DedupGlobalStep
+//	LoopsStep
+//	LambdaHolder
 func RepeatUnrollStrategy() TraversalStrategy {
 	return &traversalStrategy{name: optimizationNamespace + "RepeatUnrollStrategy"}
 }

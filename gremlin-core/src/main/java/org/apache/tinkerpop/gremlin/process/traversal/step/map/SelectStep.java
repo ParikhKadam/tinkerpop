@@ -136,7 +136,7 @@ public final class SelectStep<S, E> extends MapStep<S, Map<String, E>> implement
     public void replaceLocalChild(final Traversal.Admin<?, ?> oldTraversal, final Traversal.Admin<?, ?> newTraversal) {
         this.traversalRing.replaceTraversal(
                 (Traversal.Admin<Object, E>) oldTraversal,
-                (Traversal.Admin<Object, E>) newTraversal);
+                this.integrateChild(newTraversal));
     }
 
     @Override
@@ -161,7 +161,7 @@ public final class SelectStep<S, E> extends MapStep<S, Map<String, E>> implement
     }
 
     public Map<String, Traversal.Admin<Object, E>> getByTraversals() {
-        final Map<String, Traversal.Admin<Object, E>> map = new HashMap<>();
+        final Map<String, Traversal.Admin<Object, E>> map = new LinkedHashMap<>();
         this.traversalRing.reset();
         for (final String as : this.selectKeys) {
             map.put(as, this.traversalRing.next());

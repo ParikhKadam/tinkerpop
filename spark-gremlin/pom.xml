@@ -21,7 +21,7 @@ limitations under the License.
     <parent>
         <groupId>org.apache.tinkerpop</groupId>
         <artifactId>tinkerpop</artifactId>
-        <version>3.7.0-SNAPSHOT</version>
+        <version>4.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>spark-gremlin</artifactId>
     <name>Apache TinkerPop :: Spark Gremlin</name>
@@ -47,6 +47,11 @@ limitations under the License.
             <artifactId>hadoop-gremlin</artifactId>
             <version>${project.version}</version>
             <exclusions>
+                <!-- prefer gremlin-test/spark meterics -->
+                <exclusion>
+                    <groupId>io.dropwizard.metrics</groupId>
+                    <artifactId>metrics-core</artifactId>
+                </exclusion>
                 <!-- prefer gremlin-test/spark kerby -->
                 <exclusion>
                     <groupId>org.apache.kerby</groupId>
@@ -74,6 +79,11 @@ limitations under the License.
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-core</artifactId>
                 </exclusion>
+                <!-- Spark requires a specific range of jackson-databind. See dependency section below. -->
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>org.apache.commons</groupId>
                     <artifactId>commons-math3</artifactId>
@@ -85,6 +95,26 @@ limitations under the License.
                 <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-reload4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-all</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-epoll</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-kqueue</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-compress</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -122,10 +152,6 @@ limitations under the License.
                     <artifactId>jackson-databind</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-                <exclusion>
                     <groupId>org.scala-lang</groupId>
                     <artifactId>scala-library</artifactId>
                 </exclusion>
@@ -156,13 +182,41 @@ limitations under the License.
                     <groupId>org.apache.ivy</groupId>
                     <artifactId>ivy</artifactId>
                 </exclusion>
+                <!-- Spark 3.3.2 includes self-conflicting versions of snappy -->
+                <exclusion>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                </exclusion>
+                <!-- prefer TinkerPop's netty -->
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-all</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-epoll</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-kqueue</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <!-- resolve spark-gremlin conflicts -->
         <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>4.2.19</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-recipes</artifactId>
-            <version>4.2.0</version>
+            <version>5.2.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.zookeeper</groupId>
@@ -206,23 +260,23 @@ limitations under the License.
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
-            <version>2.12.10</version>
+            <version>2.12.15</version>
         </dependency>
-        <!-- use jackson 2.12.7 to fit better with spark where Scala module 2.12.3 requires Jackson Databind version >= 2.12.0 and < 2.13.0 -->
+        <!-- use jackson 2.13.5 to fit better with spark 2.3.3 where Scala module 2.13.4 requires Jackson Databind version >= 2.13.0 and < 2.14.0 -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.12.7</version>
+            <version>2.15.4</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.12.7</version>
+            <version>2.15.4</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.12.7</version>
+            <version>2.15.4</version>
         </dependency>
         <!-- TEST -->
         <dependency>
@@ -259,6 +313,12 @@ limitations under the License.
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <scope>test</scope>
+        </dependency>
+        <!-- Spark contains conflicting versions of snappy so it is excluded above. Include the newer version here. -->
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>1.1.8.4</version>
         </dependency>
     </dependencies>
     <build>
@@ -331,13 +391,6 @@ limitations under the License.
                             <Gremlin-Plugin-Dependencies>
                                 org.apache.hadoop:hadoop-client:${hadoop.version};org.apache.hadoop:hadoop-yarn-server-web-proxy:${hadoop.version};org.apache.spark:spark-yarn_2.12:${spark.version}
                             </Gremlin-Plugin-Dependencies>
-                            <!-- initialization failures for using jackson after 2.12.* and hadoop pulls these in -->
-                            <Gremlin-Plugin-Paths>
-                                jackson-annotations-2.13.2.jar=;jackson-databind-2.13.2.2.jar=;jackson-core-2.13.2.jar=
-                            </Gremlin-Plugin-Paths>
-                            <Gremlin-Lib-Paths>
-                                jackson-annotations-2.13.2.jar=;jackson-databind-2.13.2.2.jar=;jackson-core-2.13.2.jar=
-                            </Gremlin-Lib-Paths>
                         </manifestEntries>
                     </archive>
                 </configuration>

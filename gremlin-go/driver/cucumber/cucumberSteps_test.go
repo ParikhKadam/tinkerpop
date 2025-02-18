@@ -24,15 +24,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/apache/tinkerpop/gremlin-go/v3/driver"
-	"github.com/cucumber/godog"
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	gremlingo "github.com/apache/tinkerpop/gremlin-go/v3/driver"
+	"github.com/cucumber/godog"
 )
 
 type tinkerPopGraph struct {
@@ -41,10 +44,11 @@ type tinkerPopGraph struct {
 }
 
 var parsers map[*regexp.Regexp]func(string, string) interface{}
-var toListLock sync.Mutex
 
 func init() {
 	parsers = map[*regexp.Regexp]func(string, string) interface{}{
+		regexp.MustCompile(`^str\[(.*)]$`):          func(stringVal, graphName string) interface{} { return stringVal }, //returns the string value as is
+		regexp.MustCompile(`^dt\[(.*)]$`):           toDateTime,
 		regexp.MustCompile(`^d\[(.*)]\.[bslfdmn]$`): toNumeric,
 		regexp.MustCompile(`^d\[(.*)]\.[i]$`):       toInt32,
 		regexp.MustCompile(`^vp\[(.+)]$`):           toVertexProperty,
@@ -100,6 +104,15 @@ func parseValue(value string, graphName string) interface{} {
 	} else {
 		return parser(extractedValue, graphName)
 	}
+}
+
+// Parse dateTime.
+func toDateTime(stringVal, graphName string) interface{} {
+	val, err := time.Parse(time.RFC3339, stringVal)
+	if err != nil {
+		return nil
+	}
+	return val
 }
 
 // Parse numeric.
@@ -386,7 +399,7 @@ func (tg *tinkerPopGraph) nothingShouldHappenBecause(arg1 *godog.DocString) erro
 func (tg *tinkerPopGraph) chooseGraph(graphName string) error {
 	tg.graphName = graphName
 	data := tg.graphDataMap[graphName]
-	tg.g = gremlingo.Traversal_().WithRemote(data.connection)
+	tg.g = gremlingo.Traversal_().With(data.connection)
 	if graphName == "empty" {
 		err := tg.cleanEmptyDataGraph(tg.g)
 		if err != nil {
@@ -640,6 +653,9 @@ func compareListEqualsWithoutOrder(expected []interface{}, actual []interface{})
 	if fmt.Sprint(expected) == fmt.Sprint(actual) {
 		return true
 	}
+	if len(expected) != len(actual) {
+		return false
+	}
 	expectedCopy := make([]interface{}, len(expected))
 	copy(expectedCopy, expected)
 	for _, a := range actual {
@@ -650,6 +666,23 @@ func compareListEqualsWithoutOrder(expected []interface{}, actual []interface{})
 					expectedCopy = append(expectedCopy[:i], expectedCopy[i+1:]...)
 					found = true
 					break
+				}
+			}
+		} else if actualSet, ok := a.(*gremlingo.SimpleSet); ok {
+			// Set is a special case here because there is no TypeOf().Kind() for sets.
+			actualStringArray := makeSortedStringArrayFromSet(actualSet)
+
+			for i := len(expectedCopy) - 1; i >= 0; i-- {
+				curExpected := expectedCopy[i]
+				expectedSet, ok := curExpected.(*gremlingo.SimpleSet)
+				if ok {
+					expectedStringArray := makeSortedStringArrayFromSet(expectedSet)
+
+					if reflect.DeepEqual(actualStringArray, expectedStringArray) {
+						expectedCopy = append(expectedCopy[:i], expectedCopy[i+1:]...)
+						found = true
+						break
+					}
 				}
 			}
 		} else {
@@ -761,6 +794,16 @@ func compareListEqualsWithOf(expected []interface{}, actual []interface{}) bool 
 	return true
 }
 
+func makeSortedStringArrayFromSet(set *gremlingo.SimpleSet) []string {
+	var sortedStrings []string
+	for _, element := range set.ToSlice() {
+		sortedStrings = append(sortedStrings, fmt.Sprintf("%v", element))
+	}
+	sort.Sort(sort.StringSlice(sortedStrings))
+
+	return sortedStrings
+}
+
 func (tg *tinkerPopGraph) theTraversalOf(arg1 *godog.DocString) error {
 	traversal, err := GetTraversal(tg.scenario.Name, tg.g, tg.parameters)
 	if err != nil {
@@ -778,18 +821,6 @@ func (tg *tinkerPopGraph) usingTheParameterDefined(name string, params string) e
 	return nil
 }
 
-func (tg *tinkerPopGraph) usingTheParameterOfP(paramName, pVal, stringVal string) error {
-	predicate := reflect.ValueOf(gremlingo.P).MethodByName(strings.Title(pVal)).Interface().(func(...interface{}) gremlingo.Predicate)
-	values := parseValue(stringVal, tg.graphName)
-	switch reflect.TypeOf(values).Kind() {
-	case reflect.Array, reflect.Slice:
-		tg.parameters[paramName] = predicate(values.([]interface{})...)
-	default:
-		tg.parameters[paramName] = predicate(values)
-	}
-	return nil
-}
-
 func (tg *tinkerPopGraph) theTraversalWillRaiseAnError() error {
 	if _, ok := tg.error[true]; ok {
 		return nil
@@ -803,19 +834,19 @@ func (tg *tinkerPopGraph) theTraversalWillRaiseAnErrorWithMessageContainingTextO
 	}
 	switch comparison {
 	case "containing":
-		if strings.Contains(tg.error[true], expectedMessage) {
+		if strings.Contains(strings.ToUpper(tg.error[true]), strings.ToUpper(expectedMessage)) {
 			return nil
 		} else {
 			return fmt.Errorf("traversal error message must contain %s", expectedMessage)
 		}
 	case "starting":
-		if strings.Contains(tg.error[true], expectedMessage) {
+		if strings.Contains(strings.ToUpper(tg.error[true]), strings.ToUpper(expectedMessage)) {
 			return nil
 		} else {
 			return fmt.Errorf("traversal error message must contain %s", expectedMessage)
 		}
 	case "ending":
-		if strings.Contains(tg.error[true], expectedMessage) {
+		if strings.Contains(strings.ToUpper(tg.error[true]), strings.ToUpper(expectedMessage)) {
 			return nil
 		} else {
 			return fmt.Errorf("traversal error message must contain %s", expectedMessage)
@@ -869,7 +900,6 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the result should have a count of (\d+)$`, tg.theResultShouldHaveACountOf)
 	ctx.Step(`^the traversal of$`, tg.theTraversalOf)
 	ctx.Step(`^using the parameter (.+) defined as "(.+)"$`, tg.usingTheParameterDefined)
-	ctx.Step(`^using the parameter (.+) of P\.(.+)\("(.+)"\)$`, tg.usingTheParameterOfP)
 	ctx.Step(`^the traversal will raise an error$`, tg.theTraversalWillRaiseAnError)
 	ctx.Step(`^the traversal will raise an error with message (\w+) text of "(.+)"$`, tg.theTraversalWillRaiseAnErrorWithMessageContainingTextOf)
 }

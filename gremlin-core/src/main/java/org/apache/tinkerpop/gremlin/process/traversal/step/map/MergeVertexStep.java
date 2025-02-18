@@ -19,6 +19,7 @@
 package org.apache.tinkerpop.gremlin.process.traversal.step.map;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -27,13 +28,14 @@ import java.util.stream.Stream;
 
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.Traverser;
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
-import org.apache.tinkerpop.gremlin.process.traversal.step.util.event.Event;
-import org.apache.tinkerpop.gremlin.process.traversal.strategy.decoration.EventStrategy;
+import org.apache.tinkerpop.gremlin.process.traversal.lambda.CardinalityValueTraversal;
+import org.apache.tinkerpop.gremlin.process.traversal.lambda.ConstantTraversal;
+import org.apache.tinkerpop.gremlin.process.traversal.step.GValue;
+import org.apache.tinkerpop.gremlin.process.traversal.step.util.event.EventUtil;
 import org.apache.tinkerpop.gremlin.structure.Graph;
-import org.apache.tinkerpop.gremlin.structure.Property;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
+import org.apache.tinkerpop.gremlin.structure.VertexProperty;
 import org.apache.tinkerpop.gremlin.structure.util.CloseableIterator;
 import org.apache.tinkerpop.gremlin.util.iterator.IteratorUtils;
 
@@ -42,12 +44,12 @@ import static java.util.stream.Collectors.toList;
 /**
  * Implementation for the {@code mergeV()} step covering both the start step version and the one used mid-traversal.
  */
-public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
+public class MergeVertexStep<S> extends MergeElementStep<S, Vertex, Map> {
 
     private static final Set allowedTokens = new LinkedHashSet(Arrays.asList(T.id, T.label));
 
     public static void validateMapInput(final Map map, final boolean ignoreTokens) {
-        MergeStep.validate(map, ignoreTokens, allowedTokens, "mergeV");
+        MergeElementStep.validate(map, ignoreTokens, allowedTokens, "mergeV");
     }
 
 
@@ -56,6 +58,10 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
     }
 
     public MergeVertexStep(final Traversal.Admin traversal, final boolean isStart, final Map merge) {
+        super(traversal, isStart, merge);
+    }
+
+    public MergeVertexStep(final Traversal.Admin traversal, final boolean isStart, final GValue<Map> merge) {
         super(traversal, isStart, merge);
     }
 
@@ -73,46 +79,6 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
         return allowedTokens;
     }
 
-    /**
-     * Translate the Map into a g.V() traversal against the supplied graph. Graph providers will presumably optimize
-     * this traversal to use whatever indices are present and appropriate for efficiency.
-     *
-     * Callers are responsible for closing this iterator when finished.
-     */
-    public static CloseableIterator<Vertex> searchVertices(final Graph graph, final Map search) {
-        if (search == null)
-            return CloseableIterator.empty();
-
-        final Object id = search.get(T.id);
-        final String label = (String) search.get(T.label);
-
-        GraphTraversal t = id != null ? graph.traversal().V(id) : graph.traversal().V();
-
-        if (label != null)
-            t = t.hasLabel(label);
-
-        // add property constraints
-        for (final Map.Entry e : ((Map<?,?>) search).entrySet()) {
-            final Object k = e.getKey();
-            if (!(k instanceof String)) continue;
-            t = t.has((String) k, e.getValue());
-        }
-
-        // this should auto-close the underlying traversal
-        return CloseableIterator.of(t);
-    }
-
-    /**
-     * Translate the Map into search criteria. Default implementation is to translate the Map into a g.V() traversal.
-     * Graph providers will presumably optimize this traversal to use whatever indices are present and appropriate for
-     * efficiency.
-     *
-     * Callers are responsible for closing this iterator when finished.
-     */
-    protected CloseableIterator<Vertex> searchVertices(final Map search) {
-        return searchVertices(getGraph(), search);
-    }
-
     @Override
     protected Iterator<Vertex> flatMap(final Traverser.Admin<S> traverser) {
         final Graph graph = getGraph();
@@ -123,30 +89,42 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
         Iterator<Vertex> vertices = searchVertices(mergeMap);
 
         if (onMatchTraversal != null) {
+            if (onMatchTraversal instanceof ConstantTraversal) {
+                final Map matchMap = onMatchTraversal.next();
+                validateMapInput(matchMap, true);
+            }
+
             // attach the onMatch properties
             vertices = IteratorUtils.peek(vertices, v -> {
 
-                // if this was a start step the traverser is initialized with Boolean/false, so override that with
-                // the matched Vertex so that the option() traversal can operate on it properly
-                if (isStart) traverser.set((S) v);
+                // override current traverser with the matched Vertex so that the option() traversal can operate
+                // on it properly. prior to 4.x this only worked for start steps, but now it works consistently
+                // with mid-traversal usage. this breaks past behavior like g.inject(Map).mergeV() where you
+                // could operate on the Map directly with the child traversal. from 4.x onward you will have to do
+                // something like g.inject(Map).as('a').mergeV().option(onMatch, select('a'))
+                traverser.set((S) v);
 
                 // assume good input from GraphTraversal - folks might drop in a T here even though it is immutable
                 final Map<String, Object> onMatchMap = materializeMap(traverser, onMatchTraversal);
                 validateMapInput(onMatchMap, true);
 
                 onMatchMap.forEach((key, value) -> {
-                    // trigger callbacks for eventing - in this case, it's a VertexPropertyChangedEvent. if there's no
-                    // registry/callbacks then just set the property
-                    if (this.callbackRegistry != null && !callbackRegistry.getCallbacks().isEmpty()) {
-                        final EventStrategy eventStrategy = getTraversal().getStrategies().getStrategy(EventStrategy.class).get();
-                        final Property<?> p = v.property(key);
-                        final Property<Object> oldValue = p.isPresent() ? eventStrategy.detach(v.property(key)) : null;
-                        final Event.VertexPropertyChangedEvent vpce = new Event.VertexPropertyChangedEvent(eventStrategy.detach(v), oldValue, value);
-                        this.callbackRegistry.getCallbacks().forEach(c -> c.accept(vpce));
+                    Object val = value;
+                    VertexProperty.Cardinality card = graph.features().vertex().getCardinality(key);
+
+                    // a value can be a traversal in the case where the user specifies the cardinality for the value.
+                    if (value instanceof CardinalityValueTraversal) {
+                        final CardinalityValueTraversal cardinalityValueTraversal =  (CardinalityValueTraversal) value;
+                        card = cardinalityValueTraversal.getCardinality();
+                        val = cardinalityValueTraversal.getValue();
                     }
 
+                    // trigger callbacks for eventing - in this case, it's a VertexPropertyChangedEvent. if there's no
+                    // registry/callbacks then just set the property
+                    EventUtil.registerVertexPropertyChange(callbackRegistry, getTraversal(), v, key, val);
+
                     // try to detect proper cardinality for the key according to the graph
-                    v.property(graph.features().vertex().getCardinality(key), key, value);
+                    v.property(card, key, val);
                 });
             });
         }
@@ -167,17 +145,26 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
          */
         final Map<?,?> onCreateMap = onCreateMap(traverser, mergeMap);
 
-        final Object[] flatArgs = onCreateMap.entrySet().stream()
-                .flatMap(e -> Stream.of(e.getKey(), e.getValue())).collect(toList()).toArray();
+        // extract the key/value pairs from the map and flatten them into an array but exclude any that have a
+        // CardinalityValueTraversal as the value. you have to ignore those in a call to addVertex because that would
+        // make it so that the Graph had to know how to deal with the CardinalityValueTraversal which it doesn't. this
+        // allows this feature to work out of the box.
+        final Object[] flatArgsWithoutExplicitCardinality = onCreateMap.entrySet().stream().
+                filter(e -> !(e.getValue() instanceof CardinalityValueTraversal)).
+                flatMap(e -> Stream.of(e.getKey(), e.getValue())).collect(toList()).toArray();
 
-        final Vertex vertex = graph.addVertex(flatArgs);
+        final Vertex vertex = graph.addVertex(flatArgsWithoutExplicitCardinality);
+
+        // deal with values that have the cardinality explicitly set which should only occur on string keys
+        onCreateMap.entrySet().stream().
+                filter(e -> e.getKey() instanceof String && e.getValue() instanceof CardinalityValueTraversal).
+                forEach(e -> {
+                    final CardinalityValueTraversal cardinalityValueTraversal = (CardinalityValueTraversal) e.getValue();
+                    vertex.property(cardinalityValueTraversal.getCardinality(), (String) e.getKey(), cardinalityValueTraversal.getValue());
+                });
 
         // trigger callbacks for eventing - in this case, it's a VertexAddedEvent
-        if (this.callbackRegistry != null && !callbackRegistry.getCallbacks().isEmpty()) {
-            final EventStrategy eventStrategy = getTraversal().getStrategies().getStrategy(EventStrategy.class).get();
-            final Event.VertexAddedEvent vae = new Event.VertexAddedEvent(eventStrategy.detach(vertex));
-            this.callbackRegistry.getCallbacks().forEach(c -> c.accept(vae));
-        }
+        EventUtil.registerVertexCreationWithGenericEventRegistry(callbackRegistry, getTraversal(), vertex);
 
         return IteratorUtils.of(vertex);
     }
@@ -192,9 +179,12 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
 
         final Map onCreateMap = materializeMap(traverser, onCreateTraversal);
         // null result from onCreateTraversal - use main mergeMap argument
-        if (onCreateMap == null)
+        if (onCreateMap == null || onCreateMap.size() == 0)
             return mergeMap;
         validateMapInput(onCreateMap, false);
+
+        if (mergeMap == null || mergeMap.size() == 0)
+            return onCreateMap;
 
         /*
          * Now we need to merge the two maps - onCreate should inherit traits from mergeMap, and it is not allowed to
@@ -202,9 +192,12 @@ public class MergeVertexStep<S> extends MergeStep<S, Vertex, Map> {
          */
 
         validateNoOverrides(mergeMap, onCreateMap);
-        onCreateMap.putAll(mergeMap);
 
-        return onCreateMap;
+        final Map<Object, Object> combinedMap = new HashMap<>(onCreateMap.size() + mergeMap.size());
+        combinedMap.putAll(onCreateMap);
+        combinedMap.putAll(mergeMap);
+
+        return combinedMap;
     }
 
 }

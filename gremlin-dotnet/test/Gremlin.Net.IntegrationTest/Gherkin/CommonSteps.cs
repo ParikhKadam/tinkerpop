@@ -57,7 +57,9 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
         private static readonly IDictionary<Regex, Func<string, string, object?>> Parsers =
             new Dictionary<string, Func<string, string, object?>>
             {
+                {@"str\[(.*)\]", (x, graphName) => x }, //returns the string value as is
                 {@"vp\[(.+)\]", ToVertexProperty},
+                {@"dt\[(.+)\]", ToDateTime},
                 {@"d\[(.*)\]\.([bsilfdmn])", ToNumber},
                 {@"D\[(.+)\]", ToDirection},
                 {@"M\[(.+)\]", ToMerge},
@@ -103,7 +105,7 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
             }
             var data = ScenarioData.GetByGraphName(graphName);
             _graphName = graphName;
-            _g = Traversal().WithRemote(data.Connection);
+            _g = Traversal().With(data.Connection);
         }
 
         [Given("using the parameter (\\w+) defined as \"(.*)\"")]
@@ -111,13 +113,6 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
         {
             var parsedValue = ParseValue(value.Replace("\\\"", "\""), _graphName!);
             _parameters.Add(name, parsedValue);
-        }
-
-        [Given("using the parameter (\\w+) of P.(\\w+)\\(\"(.*)\"\\)")]
-        public void UsingParameterP(string name, string pval, string value)
-        {
-            var parsedValue = ParseValue(value.Replace("\\\"", "\""), _graphName!);
-            _parameters.Add(name, new P(pval, parsedValue));
         }
 
         [Given("the traversal of")]
@@ -227,13 +222,13 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
 
             switch (comparison) {
                 case "containing":
-                    Assert.Contains(expectedMessage, _error.Message);
+                    Assert.Contains(expectedMessage.ToUpper(), _error.Message.ToUpper());
                     break;
                 case "starting":
-                    Assert.StartsWith(expectedMessage, _error.Message);
+                    Assert.StartsWith(expectedMessage.ToUpper(), _error.Message.ToUpper());
                     break;
                 case "ending":
-                    Assert.EndsWith(expectedMessage, _error.Message);
+                    Assert.EndsWith(expectedMessage.ToUpper(), _error.Message.ToUpper());
                     break;
                 default:
                     throw new NotSupportedException(
@@ -283,6 +278,18 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
                                     break;
                                 }
                                 Assert.True(expectedArrayContainsResultDictionary);
+                            }
+                            else if (resultItem is HashSet<object> resultItemSet)
+                            {
+                                var expectedArrayContainsResultAsSet = false;
+                                foreach (var expectedItem in expectedArray)
+                                {
+                                    if (expectedItem is not HashSet<object> expectedItemSet) continue;
+                                    if (!expectedItemSet.SetEquals(resultItemSet)) continue;
+                                    expectedArrayContainsResultAsSet = true;
+                                    break;
+                                }
+                                Assert.True(expectedArrayContainsResultAsSet);
                             }
                             else if (resultItem is double resultItemDouble &&
                                      expectedArray.Select(e => e!.GetType()).Any(t => t == typeof(decimal)))
@@ -433,6 +440,11 @@ namespace Gremlin.Net.IntegrationTest.Gherkin
                 return new List<object?>(0);
             }
             return stringList.Split(',').Select(x => ParseValue(x, graphName)).ToList();
+        }
+
+        private static object ToDateTime(string date, string graphName)
+        {
+            return DateTimeOffset.Parse(date);
         }
 
         private static Vertex ToVertex(string name, string graphName)

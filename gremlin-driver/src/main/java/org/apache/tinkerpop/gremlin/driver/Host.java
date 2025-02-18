@@ -26,7 +26,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -113,8 +112,10 @@ public final class Host {
     }
 
     private static URI makeUriFromAddress(final InetSocketAddress addy, final String path, final boolean ssl) {
+        final Channelizer channelizer = new Channelizer.HttpChannelizer();
+
         try {
-            final String scheme = ssl ? "wss" : "ws";
+            final String scheme = channelizer.getScheme(ssl);
             return new URI(scheme, null, addy.getHostName(), addy.getPort(), path, null, null);
         } catch (URISyntaxException use) {
             throw new RuntimeException(String.format("URI for host could not be constructed from: %s", addy), use);
@@ -126,13 +127,13 @@ public final class Host {
         return hostLabel;
     }
 
-    public static interface Listener {
-        public void onAvailable(final Host host);
+    public interface Listener {
+        void onAvailable(final Host host);
 
-        public void onUnavailable(final Host host);
+        void onUnavailable(final Host host);
 
-        public void onNew(final Host host);
+        void onNew(final Host host);
 
-        public void onRemove(final Host host);
+        void onRemove(final Host host);
     }
 }

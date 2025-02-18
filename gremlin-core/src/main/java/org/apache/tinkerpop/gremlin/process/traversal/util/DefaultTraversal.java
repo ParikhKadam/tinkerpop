@@ -19,7 +19,7 @@
 package org.apache.tinkerpop.gremlin.process.traversal.util;
 
 import org.apache.tinkerpop.gremlin.process.computer.traversal.step.map.VertexProgramStep;
-import org.apache.tinkerpop.gremlin.process.traversal.Bytecode;
+import org.apache.tinkerpop.gremlin.process.traversal.GremlinLang;
 import org.apache.tinkerpop.gremlin.process.traversal.Step;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.TraversalSideEffects;
@@ -68,40 +68,40 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
 
     protected boolean locked = false;
     protected boolean closed = false;
-    protected Bytecode bytecode;
+    protected GremlinLang gremlinLang;
 
-    private DefaultTraversal(final Graph graph, final TraversalStrategies traversalStrategies, final Bytecode bytecode) {
+    private DefaultTraversal(final Graph graph, final TraversalStrategies traversalStrategies, final GremlinLang gremlinLang) {
         this.graph = graph;
         this.strategies = traversalStrategies;
-        this.bytecode = bytecode;
+        this.gremlinLang = gremlinLang;
         this.g = null;
     }
 
     public DefaultTraversal(final Graph graph) {
-        this(graph, TraversalStrategies.GlobalCache.getStrategies(graph.getClass()), new Bytecode());
+        this(graph, TraversalStrategies.GlobalCache.getStrategies(graph.getClass()), new GremlinLang());
     }
 
     public DefaultTraversal(final TraversalSource traversalSource) {
-        this(traversalSource.getGraph(), traversalSource.getStrategies(), traversalSource.getBytecode());
+        this(traversalSource.getGraph(), traversalSource.getStrategies(), traversalSource.getGremlinLang());
         this.g = traversalSource;
     }
 
     public DefaultTraversal(final TraversalSource traversalSource, final DefaultTraversal.Admin<S,E> traversal) {
-        this(traversalSource.getGraph(), traversalSource.getStrategies(), traversal.getBytecode());
+        this(traversalSource.getGraph(), traversalSource.getStrategies(), traversal.getGremlinLang());
         this.g = traversalSource;
         steps.addAll(traversal.getSteps());
     }
 
     public DefaultTraversal() {
-        this(EmptyGraph.instance(), TraversalStrategies.GlobalCache.getStrategies(EmptyGraph.class), new Bytecode());
+        this(EmptyGraph.instance(), TraversalStrategies.GlobalCache.getStrategies(EmptyGraph.class), new GremlinLang());
     }
 
-    public DefaultTraversal(final Bytecode bytecode) {
-        this(EmptyGraph.instance(), TraversalStrategies.GlobalCache.getStrategies(EmptyGraph.class), bytecode);
+    public DefaultTraversal(final GremlinLang gremlinLang) {
+        this(EmptyGraph.instance(), TraversalStrategies.GlobalCache.getStrategies(EmptyGraph.class), gremlinLang);
     }
 
-    public Bytecode getBytecode() {
-        return this.bytecode;
+    public GremlinLang getGremlinLang() {
+        return this.gremlinLang;
     }
 
     @Override
@@ -121,63 +121,20 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
     @Override
     public void applyStrategies() throws IllegalStateException {
         if (this.locked) throw Traversal.Exceptions.traversalIsLocked();
-        TraversalHelper.reIdSteps(this.stepPosition, this);
-        final boolean hasGraph = null != this.graph;
 
-        // we only want to apply strategies on the top-level step or if we got some graphcomputer stuff going on.
-        // seems like in that case, the "top-level" of the traversal is really held by the VertexProgramStep which
-        // needs to have strategies applied on "pure" copies of the traversal it is holding (i think). it further
-        // seems that we need three recursions over the traversal hierarchy to ensure everything "works", where
-        // strategy application requires top-level strategies and side-effects pushed into each child and then after
-        // application of the strategies we need to call applyStrategies() on all the children to ensure that their
-        // steps get reId'd and traverser requirements are set.
+        // apply strategies in order on a root traversal only or a traversal that is logically considered a root
+        // for GraphComputer as a child of VertexProgramStep.
         if (isRoot() || this.getParent() instanceof VertexProgramStep) {
-
-            // prepare the traversal and all its children for strategy application
-            TraversalHelper.applyTraversalRecursively(t -> {
-                if (hasGraph) t.setGraph(this.graph);
-                t.setStrategies(this.strategies);
-                t.setSideEffects(this.sideEffects);
-            }, this);
-
-            // note that prior to applying strategies to children we used to set side-effects and strategies of all
-            // children to that of the parent. under this revised model of strategy application from TINKERPOP-1568
-            // it doesn't appear to be necessary to do that (at least from the perspective of the test suite). by,
-            // moving side-effect setting after actual recursive strategy application we save a loop and by
-            // consequence also fix a problem where strategies might reset something in sideeffects which seems to
-            // happen in TranslationStrategy.
             final Iterator<TraversalStrategy<?>> strategyIterator = this.strategies.iterator();
             while (strategyIterator.hasNext()) {
                 final TraversalStrategy<?> strategy = strategyIterator.next();
-                TraversalHelper.applyTraversalRecursively(t -> {
-                    strategy.apply(t);
-
-                    // after the strategy is applied, it may have modified the traversal where a new traversal object
-                    // was added. if the strategy didn't set the Graph object it could leave that new traversal in a
-                    // state where another strategy might fail if that dependency is not satisfied
-                    TraversalHelper.applyTraversalRecursively(i -> {
-                        if (hasGraph) i.setGraph(this.graph);
-                    }, this);
-                }, this);
+                TraversalHelper.applyTraversalRecursively(strategy::apply, this);
             }
-
-            // don't need to re-apply strategies to "this" - leads to endless recursion in GraphComputer.
-            TraversalHelper.applyTraversalRecursively(t -> {
-                if (hasGraph) t.setGraph(this.graph);
-                if(!(t.isRoot()) && t != this && !t.isLocked()) {
-                    t.setSideEffects(this.sideEffects);
-                    t.applyStrategies();
-                }
-            }, this);
         }
-        
-        this.finalEndStep = this.getEndStep();
 
-        // finalize requirements
-        if (this.isRoot()) {
-            resetTraverserRequirements();
-        }
-        this.locked = true;
+        // lock the traversal and its children for execution, finalizing the copy of any data from parent to child
+        // as needed
+        this.lock();
     }
 
     private void resetTraverserRequirements() {
@@ -315,7 +272,7 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
             clone.unmodifiableSteps = Collections.unmodifiableList(clone.steps);
             clone.sideEffects = this.sideEffects.clone();
             clone.strategies = this.strategies;
-            clone.bytecode = this.bytecode.clone();
+            clone.gremlinLang = this.gremlinLang.clone();
             for (final Step<?, ?> step : this.steps) {
                 final Step<?, ?> clonedStep = step.clone();
                 clonedStep.setTraversal(clone);
@@ -335,6 +292,45 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
     @Override
     public boolean isLocked() {
         return this.locked;
+    }
+
+    /**
+     * Allow the locked property of the traversal to be directly set by those who know what they are doing. Are you
+     * sure you know what you're doing?
+     */
+    public void setLocked(final boolean locked) {
+        this.locked = locked;
+    }
+
+    @Override
+    public void lock() {
+        TraversalHelper.reIdSteps(stepPosition, this);
+
+        // normalize strategies, side-effects, and Graph through children. obviously ignore the root traversal, since
+        // there is no parent to draw data from and ignore stuff wrapped for GraphComputer execution and the root
+        // from which to draw child data from is logically the current traversal.
+        if (!isRoot() && !(parent instanceof VertexProgramStep)) {
+            final TraversalParent parent = getParent();
+            final Traversal.Admin parentTraversal = parent.asStep().getTraversal().asAdmin();
+            this.setStrategies(parentTraversal.getStrategies());
+            this.setSideEffects(parentTraversal.getSideEffects());
+
+            // not sure why java is complaining about generics here that i have to do this??
+            if (parentTraversal.getGraph().isPresent())
+                this.setGraph((Graph) parentTraversal.getGraph().get());
+        }
+
+        this.finalEndStep = this.getEndStep();
+
+        if (this.isRoot()) {
+            resetTraverserRequirements();
+        }
+
+        // lock the parent before the children
+        this.locked = true;
+
+        // now lock all the children
+        TraversalHelper.applyTraversalRecursively(Admin::lock, this, true);
     }
 
     /**
@@ -408,7 +404,13 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
 
     @Override
     public Optional<Graph> getGraph() {
-        return Optional.ofNullable(this.graph);
+        final Optional<Graph> optionalGraph =  Optional.ofNullable(this.graph);
+        if (!optionalGraph.isPresent() || optionalGraph.get() == EmptyGraph.instance()) {
+            final TraversalParent parent = getParent();
+            if (parent != EmptyStep.instance())
+                return parent.asStep().getTraversal().getGraph();
+        }
+        return optionalGraph;
     }
 
     @Override
@@ -420,7 +422,7 @@ public class DefaultTraversal<S, E> implements Traversal.Admin<S, E> {
     public void setGraph(final Graph graph) {
         this.graph = graph;
     }
-    
+
     @Override
     public boolean equals(final Object other) {
         return other != null && other.getClass().equals(this.getClass()) && this.equals(((Traversal.Admin) other));

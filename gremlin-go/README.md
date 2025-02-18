@@ -30,8 +30,8 @@ for early testing purposes only.
 data-flow language that enables users to succinctly express complex traversals on (or queries of) their application's
 property graph.
 
-Gremlin-Go implements Gremlin within the Go language and can be used on any Go runtime greater than v1.17. One
-important difference between Go and Java is that the functions are capitalized, as is required to export functions is Go.
+Gremlin-Go implements Gremlin within the Go language and can be used on any Go runtime greater than v1.22. One
+important difference between Go and Java is that the functions are capitalized, as is required to export functions is Go. 
 
 Gremlin-Go is designed to connect to a "server" that is hosting a TinkerPop-enabled graph system. That "server"
 could be [Gremlin Server][gs] or a [remote Gremlin provider][rgp] that exposes protocols by which Gremlin-Go
@@ -59,7 +59,7 @@ func main() {
 	defer driverRemoteConnection.Close()
 
 	// Create an anonymous traversal source with remote
-	g := gremlingo.Traversal_().WithRemote(driverRemoteConnection)
+	g := gremlingo.Traversal_().With(driverRemoteConnection)
 
 	// Add a vertex with properties to the graph with the terminal step Iterate()
 	promise := g.AddV("gremlin").Property("language", "go").Iterate()
